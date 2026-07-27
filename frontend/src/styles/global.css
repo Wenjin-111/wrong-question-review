@@ -1,0 +1,112 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #F2F2F7;
+  color: #1D1D1F;
+}
+
+/* Glass effect — 磨砂玻璃 */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(60, 60, 67, 0.08);
+}
+
+/* Card with elevation */
+.card-elevated {
+  background: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.card-elevated:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Section title */
+.section-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1D1D1F;
+  letter-spacing: -0.02em;
+}
+
+.text-secondary {
+  color: #86868B;
+}
+
+.text-tertiary {
+  color: #AEAEB2;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(60, 60, 67, 0.18);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(60, 60, 67, 0.3);
+}
+
+/* Ant Design overrides for Apple style */
+.ant-menu-item {
+  margin: 2px 8px !important;
+  width: auto !important;
+  border-radius: 8px !important;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
+}
+
+.ant-menu-item-selected {
+  font-weight: 500;
+}
+
+.ant-btn {
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.ant-btn-primary {
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+}
+
+.ant-btn-primary:hover {
+  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.4);
+}
+
+.ant-card {
+  transition: box-shadow 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Page transition */
+.page-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
