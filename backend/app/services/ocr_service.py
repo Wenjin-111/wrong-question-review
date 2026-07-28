@@ -2,9 +2,18 @@ import os
 
 from app.config import settings
 
+_ocr_instance = None
+
+
+def _get_ocr():
+    global _ocr_instance
+    if _ocr_instance is None:
+        from paddleocr import PaddleOCR
+        _ocr_instance = PaddleOCR(lang="ch", use_gpu=False)
+    return _ocr_instance
+
 
 def ocr_recognize(image_path: str, crop: dict | None = None, rotation: int = 0) -> dict:
-    from paddleocr import PaddleOCR
     from PIL import Image
 
     img = Image.open(image_path)
@@ -13,7 +22,7 @@ def ocr_recognize(image_path: str, crop: dict | None = None, rotation: int = 0) 
     if crop:
         img = img.crop((crop["x"], crop["y"], crop["x"] + crop["width"], crop["y"] + crop["height"]))
 
-    ocr = PaddleOCR(lang="ch", use_gpu=False)
+    ocr = _get_ocr()
     import numpy as np
     img_array = np.array(img)
     results = ocr.ocr(img_array, cls=False)

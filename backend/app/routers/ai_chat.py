@@ -21,7 +21,11 @@ class SendMessageRequest(BaseModel):
 
 
 class CreateSessionRequest(BaseModel):
-    question_id: int
+    question_id: int | None = None
+
+
+class BindQuestionRequest(BaseModel):
+    question_id: int | None = None
 
 
 @router.get("/sessions")
@@ -34,7 +38,7 @@ def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(ge
     )
     result = []
     for s in sessions:
-        q = db.query(Question).filter(Question.id == s.question_id).first()
+        q = db.query(Question).filter(Question.id == s.question_id).first() if s.question_id else None
         last_msg = (
             db.query(AiChatMessage)
             .filter(AiChatMessage.session_id == s.id, AiChatMessage.role != "system")
@@ -44,7 +48,7 @@ def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(ge
         result.append({
             "id": s.id,
             "question_id": s.question_id,
-            "title": s.title or ((q.content_plain or q.content)[:50] if q else "未知题目"),
+            "title": s.title or ((q.content_plain or q.content)[:50] if q else "自由对话"),
             "question_preview": (q.content_plain or "")[:80] if q else "",
             "last_message": last_msg.content[:80] if last_msg else "",
             "created_at": s.created_at.isoformat(),
@@ -55,16 +59,35 @@ def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(ge
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 def create_session(req: CreateSessionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    q = db.query(Question).filter(Question.id == req.question_id, Question.user_id == current_user.id).first()
-    if not q:
-        raise HTTPException(status_code=404, detail="题目不存在")
+    q = None
+    if req.question_id:
+        q = db.query(Question).filter(Question.id == req.question_id, Question.user_id == current_user.id).first()
+        if not q:
+            raise HTTPException(status_code=404, detail="题目不存在")
 
-    title = (q.content_plain or q.content or "")[:50]
-    session = ChatSession(user_id=current_user.id, question_id=req.question_id, title=title)
+    session = ChatSession(user_id=current_user.id, question_id=req.question_id, title="新对话")
     db.add(session)
     db.commit()
     db.refresh(session)
     return {"id": session.id, "question_id": session.question_id, "title": session.title}
+
+
+@router.put("/sessions/{session_id}/bind")
+def bind_question(session_id: int, req: BindQuestionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    s = db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.user_id == current_user.id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="会话不存在")
+
+    if req.question_id is not None:
+        q = db.query(Question).filter(Question.id == req.question_id, Question.user_id == current_user.id).first()
+        if not q:
+            raise HTTPException(status_code=404, detail="题目不存在")
+        s.question_id = q.id
+    else:
+        s.question_id = None
+    s.updated_at = datetime.utcnow()
+    db.commit()
+    return {"id": s.id, "question_id": s.question_id, "title": s.title}
 
 
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -96,9 +119,7 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
     if not s:
         raise HTTPException(status_code=404, detail="会话不存在")
 
-    question = db.query(Question).filter(Question.id == s.question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="题目不存在")
+    question = db.query(Question).filter(Question.id == s.question_id).first() if s.question_id else None
 
     api_url = _get_config(db, current_user.id, "ai_api_url")
     api_key = _get_config(db, current_user.id, "ai_api_key")
@@ -123,7 +144,10 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
 
     api_messages = []
     if not history:
-        system_prompt = f"用户正在复习一道错题。题目内容：{question.content} 正确答案：{question.answer} 解析：{question.explanation or '无'}。请以答疑老师的身份帮助用户理解这道题目涉及的知识点。"
+        if question:
+            system_prompt = f"用户正在复习一道错题。题目内容：{question.content} 正确答案：{question.answer} 解析：{question.explanation or '无'}。请以答疑老师的身份帮助用户理解这道题目涉及的知识点。"
+        else:
+            system_prompt = "你是一个学习助手，请帮助用户解答学习中的问题，给出清晰、有条理的回答。"
         api_messages.append({"role": "system", "content": system_prompt})
         db.add(AiChatMessage(user_id=uid, question_id=qid, session_id=sid, role="system", content=system_prompt))
 
@@ -133,6 +157,8 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
     db.add(AiChatMessage(user_id=uid, question_id=qid, session_id=sid, role="user", content=req.message))
     api_messages.append({"role": "user", "content": req.message})
     s.updated_at = datetime.utcnow()
+    if s.title == "新对话":
+        s.title = req.message[:30] + ("..." if len(req.message) > 30 else "")
     db.commit()
 
     async def generate():

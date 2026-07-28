@@ -9,6 +9,7 @@ class ReviewRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
     question_id = Column(Integer, ForeignKey("question.id", ondelete="CASCADE"), nullable=False)
+    session_id = Column(Integer, ForeignKey("review_session.id", ondelete="SET NULL"), nullable=True)
     is_correct = Column(Boolean, nullable=False)
     user_answer = Column(String(2000), nullable=True)
     review_mode = Column(Enum("free", "spaced"), nullable=False)

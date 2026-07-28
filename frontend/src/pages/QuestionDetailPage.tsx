@@ -47,6 +47,14 @@ export default function QuestionDetailPage() {
     try {
       const ans = JSON.parse(question.answer);
       if (ans.options) {
+        const hasOptionText = ans.options.some((o: string) => o?.trim());
+        if (!hasOptionText && ans.correct?.length > 0) {
+          return (
+            <div style={{ color: showAnswer ? '#34C759' : '#1D1D1F' }}>
+              正确答案：{ans.correct.join('、')}
+            </div>
+          );
+        }
         return (
           <div>
             {ans.options.map((o: string, i: number) => {

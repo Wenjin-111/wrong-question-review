@@ -52,34 +52,51 @@ export default function ReviewSessionPage() {
   const renderCorrectAnswerText = () => {
     try {
       const ans = JSON.parse(correctAnswer);
-      if (ans.options) return ans.options.map((o: string, i: number) => (
-        <div key={i} style={{ color: ans.correct?.includes(String.fromCharCode(65 + i)) ? '#34C759' : '#1D1D1F', fontWeight: ans.correct?.includes(String.fromCharCode(65 + i)) ? 600 : 400 }}>
-          {String.fromCharCode(65 + i)}. {o} {ans.correct?.includes(String.fromCharCode(65 + i)) && '✓'}
-        </div>
-      ));
+      if (ans.options) {
+        const hasOptionText = ans.options.some((o: string) => o?.trim());
+        if (!hasOptionText && ans.correct?.length > 0) {
+          return <Text style={{ color: '#34C759' }}>正确答案：{ans.correct.join('、')}</Text>;
+        }
+        return ans.options.map((o: string, i: number) => (
+          <div key={i} style={{ color: ans.correct?.includes(String.fromCharCode(65 + i)) ? '#34C759' : '#1D1D1F', fontWeight: ans.correct?.includes(String.fromCharCode(65 + i)) ? 600 : 400 }}>
+            {String.fromCharCode(65 + i)}. {o} {ans.correct?.includes(String.fromCharCode(65 + i)) && '✓'}
+          </div>
+        ));
+      }
       if (ans.blanks) return <Space wrap>{ans.blanks.map((b: string, i: number) => <Tag key={i} color="green">{b}</Tag>)}</Space>;
       if (ans.reference) return <TiptapViewer content={ans.reference} />;
       return <Text>{correctAnswer}</Text>;
     } catch { return <Text>{correctAnswer}</Text>; }
   };
 
+  const getChoiceOptions = (ans: any): string[] => {
+    const opts: string[] = ans.options || [];
+    const hasText = opts.some((o: string) => o?.trim());
+    if (hasText) return opts;
+    const maxLetter = Math.max(4, ...(ans.correct || []).map((c: string) => c.charCodeAt(0) - 64));
+    const result: string[] = [];
+    for (let i = 0; i < maxLetter; i++) result.push(opts[i] || '');
+    return result;
+  };
+
   const renderAnswerInput = () => {
     if (answerData?.options) {
+      const options = getChoiceOptions(answerData);
       const isMulti = (answerData.correct || []).length > 1;
       const selected = (() => { try { return JSON.parse(userAnswer || '{}').selected || []; } catch { return []; } })();
       return isMulti ? (
         <Checkbox.Group value={selected} onChange={(vals) => setUserAnswer(JSON.stringify({ selected: vals }))}>
           <Space direction="vertical">
-            {answerData.options.map((opt: string, i: number) => (
-              <Checkbox key={i} value={String.fromCharCode(65 + i)} style={{ fontSize: 15, padding: '4px 0' }}>{opt}</Checkbox>
+            {options.map((opt: string, i: number) => (
+              <Checkbox key={i} value={String.fromCharCode(65 + i)} style={{ fontSize: 15, padding: '4px 0' }}>{opt || String.fromCharCode(65 + i)}</Checkbox>
             ))}
           </Space>
         </Checkbox.Group>
       ) : (
         <Radio.Group onChange={(e) => setUserAnswer(JSON.stringify({ selected: [e.target.value] }))} value={selected[0]}>
           <Space direction="vertical">
-            {answerData.options.map((opt: string, i: number) => (
-              <Radio key={i} value={String.fromCharCode(65 + i)} style={{ fontSize: 15, padding: '4px 0' }}>{opt}</Radio>
+            {options.map((opt: string, i: number) => (
+              <Radio key={i} value={String.fromCharCode(65 + i)} style={{ fontSize: 15, padding: '4px 0' }}>{opt || String.fromCharCode(65 + i)}</Radio>
             ))}
           </Space>
         </Radio.Group>
@@ -111,11 +128,30 @@ export default function ReviewSessionPage() {
     if (!userAnswer) { message.warning('请先作答'); return; }
     setSubmitting(true);
     try {
+      const userAnswerStr = typeof userAnswer === 'string' ? userAnswer : JSON.stringify(userAnswer);
       const { data } = await reviewApi.submitAnswer(session.session_id, {
         question_id: question.id,
-        user_answer: typeof userAnswer === 'string' ? userAnswer : JSON.stringify(userAnswer),
+        user_answer: userAnswerStr,
       });
       const res = data.data || data;
+      const correctAns = JSON.parse(res.correct_answer);
+
+      // 选择题自动判断对错，跳过自评步骤
+      if (answerData?.options) {
+        const userAns = JSON.parse(userAnswerStr);
+        const correctSet = new Set(correctAns.correct || []);
+        const selectedSet = new Set(userAns.selected || []);
+        const autoCorrect = correctSet.size === selectedSet.size && [...correctSet].every((c) => selectedSet.has(c));
+
+        await reviewApi.submitAnswer(session.session_id, {
+          question_id: question.id,
+          user_answer: userAnswerStr,
+          is_correct: autoCorrect,
+        });
+        setIsCorrect(autoCorrect);
+        setEvaluated(true);
+      }
+
       setCorrectAnswer(res.correct_answer);
       setExplanation(res.explanation);
       setSubmitted(true);

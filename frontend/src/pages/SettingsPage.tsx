@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Tabs, Card, Button, Modal, Form, Input, Popconfirm, message, Empty, Space, Tag, Typography } from 'antd';
+import { Tabs, Card, Button, Modal, Form, Input, InputNumber, Popconfirm, message, Empty, Space, Tag, Typography } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined, DownloadOutlined } from '@ant-design/icons';
 import { subjectsApi } from '../api/subjects';
 import { tagsApi } from '../api/tags';

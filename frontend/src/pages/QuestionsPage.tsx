@@ -16,6 +16,7 @@ const { Text } = Typography;
 
 interface QuestionItem {
   id: number;
+  code: string;
   content: string;
   content_plain?: string;
   subject_id: number;
@@ -105,11 +106,9 @@ export default function QuestionsPage() {
 
   const columns: ColumnsType<QuestionItem> = [
     {
-      title: '题目摘要', dataIndex: 'content', width: 280,
-      render: (text: string) => (
-        <div style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {text.replace(/<[^>]+>/g, '').slice(0, 80)}
-        </div>
+      title: '编号', dataIndex: 'code', width: 180,
+      render: (code: string) => (
+        <Text style={{ fontFamily: 'monospace', fontWeight: 500, fontSize: 13 }}>{code}</Text>
       ),
     },
     {

@@ -24,6 +24,7 @@ class QuestionUpdate(BaseModel):
 
 class QuestionOut(BaseModel):
     id: int
+    code: str = ""
     subject_id: int
     question_type_id: int
     content: str

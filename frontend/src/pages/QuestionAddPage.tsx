@@ -35,6 +35,13 @@ export default function QuestionAddPage() {
   const [loading, setLoading] = useState(false);
   const [drafts, setDrafts] = useState<{ id: number; content: string; updated_at: string }[]>([]);
 
+  const getAnswerTypeFromTypeName = (name: string): string | null => {
+    if (/选择/.test(name)) return 'choice';
+    if (/填空/.test(name)) return 'fill';
+    if (/简答|问答|主观|论述/.test(name)) return 'subjective';
+    return null;
+  };
+
   useEffect(() => {
     draftApi.list().then(({ data }) => setDrafts(data.data || data || [])).catch(() => {});
   }, []);
@@ -155,8 +162,7 @@ export default function QuestionAddPage() {
 
   const buildAnswer = (): string => {
     if (answerType === 'choice') {
-      const filtered = options.filter((o) => o.trim());
-      return JSON.stringify({ options: filtered, correct: correctOptions });
+      return JSON.stringify({ options, correct: correctOptions });
     }
     if (answerType === 'fill') {
       const filtered = blanks.filter((b) => b.trim());
@@ -246,6 +252,15 @@ export default function QuestionAddPage() {
                 <Col span={12}>
                   <Form.Item name="question_type_id" label="题型" rules={[{ required: true, message: '请选择' }]}>
                     <Select placeholder="先选学科"
+                      onChange={(id) => {
+                        if (id) {
+                          const selected = questionTypes.find((t) => t.id === id);
+                          if (selected) {
+                            const autoType = getAnswerTypeFromTypeName(selected.name);
+                            if (autoType) setAnswerType(autoType);
+                          }
+                        }
+                      }}
                       options={questionTypes.map((t) => ({ label: t.name, value: t.id }))} />
                   </Form.Item>
                 </Col>

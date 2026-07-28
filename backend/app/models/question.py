@@ -21,3 +21,5 @@ class Question(Base):
     updated_at = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 
     tags = relationship("Tag", secondary="question_tag", backref="questions")
+    subject = relationship("Subject", backref="questions")
+    question_type = relationship("QuestionType", backref="questions")

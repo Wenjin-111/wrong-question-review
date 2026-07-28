@@ -2,7 +2,7 @@ import re
 import json
 from datetime import datetime
 
-from sqlalchemy import func, or_, text, desc, asc
+from sqlalchemy import func, or_, text, desc, asc, Integer, cast, Date
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.question import Question
@@ -63,14 +63,22 @@ def paginate_questions(db: Session, user_id: int, params: dict) -> tuple[list[Qu
     page_size = min(50, max(1, int(params.get("page_size", 20))))
     q = q.offset((page - 1) * page_size).limit(page_size)
 
-    questions = q.options(joinedload(Question.tags)).all()
+    questions = q.options(
+        joinedload(Question.tags),
+        joinedload(Question.subject),
+        joinedload(Question.question_type),
+    ).all()
     return questions, total
 
 
 def get_question_with_tags(db: Session, question_id: int, user_id: int) -> Question | None:
     return (
         db.query(Question)
-        .options(joinedload(Question.tags))
+        .options(
+            joinedload(Question.tags),
+            joinedload(Question.subject),
+            joinedload(Question.question_type),
+        )
         .filter(Question.id == question_id, Question.user_id == user_id, Question.is_deleted == False)
         .first()
     )
@@ -146,3 +154,70 @@ def get_question_stats(db: Session, question_id: int) -> dict:
     total = db.query(func.count(ReviewRecord.id)).filter(ReviewRecord.question_id == question_id).scalar() or 0
     correct = db.query(func.count(ReviewRecord.id)).filter(ReviewRecord.question_id == question_id, ReviewRecord.is_correct == True).scalar() or 0
     return {"total_attempts": total, "correct_attempts": correct, "accuracy": (correct / total * 100) if total > 0 else 0.0}
+
+
+def get_batch_question_stats(db: Session, question_ids: list[int]) -> dict[int, dict]:
+    if not question_ids:
+        return {}
+    rows = (
+        db.query(
+            ReviewRecord.question_id,
+            func.count(ReviewRecord.id).label("total"),
+            func.sum(ReviewRecord.is_correct.cast(Integer)).label("correct"),
+        )
+        .filter(ReviewRecord.question_id.in_(question_ids))
+        .group_by(ReviewRecord.question_id)
+        .all()
+    )
+    result = {}
+    for qid, total, correct in rows:
+        correct = correct or 0
+        result[qid] = {
+            "total_attempts": total,
+            "correct_attempts": correct,
+            "accuracy": (correct / total * 100) if total > 0 else 0.0,
+        }
+    for qid in question_ids:
+        if qid not in result:
+            result[qid] = {"total_attempts": 0, "correct_attempts": 0, "accuracy": 0.0}
+    return result
+
+
+def get_type_abbr(type_name: str) -> str:
+    mapping = {
+        "选择题": "CT", "选择": "CT",
+        "填空题": "FT", "填空": "FT",
+        "简答题": "SA", "简答": "SA",
+        "问答题": "QA", "问答": "QA",
+        "主观题": "SB", "主观": "SB",
+        "判断题": "TF", "判断": "TF",
+        "论述题": "ES", "论述": "ES",
+    }
+    return mapping.get(type_name, type_name[:2])
+
+
+def compute_question_codes(db: Session, user_id: int, questions: list[Question]) -> dict[int, str]:
+    if not questions:
+        return {}
+    ids = [q.id for q in questions]
+    rows = (
+        db.query(
+            Question.id,
+            func.row_number()
+            .over(
+                partition_by=cast(Question.created_at, Date),
+                order_by=Question.id,
+            )
+            .label("seq"),
+        )
+        .filter(Question.id.in_(ids), Question.user_id == user_id)
+        .all()
+    )
+    seq_map = {row.id: row.seq for row in rows}
+    result = {}
+    for q in questions:
+        date_str = q.created_at.strftime("%Y%m%d") if q.created_at else "00000000"
+        seq = seq_map.get(q.id, 0)
+        abbr = get_type_abbr(q.question_type.name) if q.question_type else "OT"
+        result[q.id] = f"{date_str}_{seq:02d}{abbr}"
+    return result

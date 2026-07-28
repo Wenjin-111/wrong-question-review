@@ -12,7 +12,7 @@ def get_ai_client() -> httpx.AsyncClient:
     global _client
     if _client is None:
         _client = httpx.AsyncClient(
-            timeout=30,
+            timeout=httpx.Timeout(connect=10, read=120, write=10, pool=10),
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         )
     return _client
@@ -25,32 +25,36 @@ async def call_ai(
     messages: list[dict],
     stream: bool = False,
 ) -> str | AsyncGenerator[str, None]:
-    client = get_ai_client()
-    response = await client.post(
-        f"{api_url.rstrip('/')}/chat/completions",
-        headers={"Authorization": f"Bearer {api_key}"},
-        json={"model": model, "messages": messages, "stream": stream},
-    )
-    response.raise_for_status()
+    url = f"{api_url.rstrip('/')}/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    body = {"model": model, "messages": messages, "stream": stream}
+
     if stream:
-        return _stream_response(response)
+        return _stream_ai_response(url, headers, body)
+
+    client = get_ai_client()
+    response = await client.post(url, headers=headers, json=body, timeout=60)
+    response.raise_for_status()
     data = response.json()
     return data["choices"][0]["message"]["content"]
 
 
-async def _stream_response(response: httpx.Response) -> AsyncGenerator[str, None]:
-    async for line in response.aiter_lines():
-        if line.startswith("data: "):
-            data_str = line[6:]
-            if data_str == "[DONE]":
-                break
-            try:
-                chunk = json.loads(data_str)
-                delta = chunk["choices"][0].get("delta", {})
-                if "content" in delta and delta["content"] is not None:
-                    yield delta["content"]
-            except (json.JSONDecodeError, KeyError, IndexError):
-                continue
+async def _stream_ai_response(url: str, headers: dict, body: dict) -> AsyncGenerator[str, None]:
+    client = get_ai_client()
+    async with client.stream("POST", url, headers=headers, json=body) as response:
+        response.raise_for_status()
+        async for line in response.aiter_lines():
+                if line.startswith("data: "):
+                    data_str = line[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        delta = chunk["choices"][0].get("delta", {})
+                        if "content" in delta and delta["content"] is not None:
+                            yield delta["content"]
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        continue
 
 
 async def parse_question_text(api_url: str, api_key: str, model: str, ocr_text: str) -> dict:

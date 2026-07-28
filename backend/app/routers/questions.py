@@ -23,26 +23,6 @@ ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "bmp", "webp"}
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
-def _format_question(q: Question) -> QuestionOut:
-    stats = question_service.get_question_stats(db=None, question_id=q.id)  # FIXME
-    return QuestionOut(
-        id=q.id,
-        subject_id=q.subject_id,
-        question_type_id=q.question_type_id,
-        content=q.content,
-        content_plain=q.content_plain,
-        answer=q.answer,
-        explanation=q.explanation,
-        source=q.source,
-        is_deleted=q.is_deleted,
-        created_at=q.created_at,
-        updated_at=q.updated_at,
-        tag_ids=[t.id for t in q.tags],
-        tag_names=[t.name for t in q.tags],
-        **stats,
-    )
-
-
 @router.get("/questions", response_model=QuestionListOut)
 def list_questions(
     subject_id: str | None = None,
@@ -57,31 +37,47 @@ def list_questions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    params = {k: v for k, v in locals().items() if v is not None and k not in ("db", "current_user")}
+    params = {k: v for k, v in locals().items() if v is not None and k not in ("db", "current_user", "req")}
     questions, total = question_service.paginate_questions(db, current_user.id, params)
+
+    question_ids = [q.id for q in questions]
+    stats_map = question_service.get_batch_question_stats(db, question_ids)
+    code_map = question_service.compute_question_codes(db, current_user.id, questions)
 
     items = []
     for q in questions:
-        items.append(_build_question_out(q, db, truncate=True))
+        stats = stats_map.get(q.id, {"total_attempts": 0, "correct_attempts": 0, "accuracy": 0.0})
+        items.append(QuestionOut(
+            id=q.id, code=code_map.get(q.id, ""),
+            subject_id=q.subject_id, question_type_id=q.question_type_id,
+            content=q.content[:200],
+            content_plain=q.content_plain,
+            answer=q.answer, explanation=q.explanation, source=q.source,
+            is_deleted=q.is_deleted, created_at=q.created_at, updated_at=q.updated_at,
+            subject_name=q.subject.name if q.subject else "",
+            subject_color=q.subject.color if q.subject else "",
+            type_name=q.question_type.name if q.question_type else "",
+            tag_ids=[t.id for t in q.tags],
+            tag_names=[t.name for t in q.tags],
+            **stats,
+        ))
 
     return QuestionListOut(items=items, total=total, page=page, page_size=page_size)
 
 
 def _build_question_out(q: Question, db: Session, truncate: bool = False) -> QuestionOut:
-    from app.models.subject import Subject
-    from app.models.question_type import QuestionType
     stats = question_service.get_question_stats(db, q.id)
-    subject = db.query(Subject).filter(Subject.id == q.subject_id).first()
-    qtype = db.query(QuestionType).filter(QuestionType.id == q.question_type_id).first()
+    code_map = question_service.compute_question_codes(db, q.user_id, [q])
     return QuestionOut(
-        id=q.id, subject_id=q.subject_id, question_type_id=q.question_type_id,
+        id=q.id, code=code_map.get(q.id, ""),
+        subject_id=q.subject_id, question_type_id=q.question_type_id,
         content=q.content[:200] if truncate else q.content,
         content_plain=q.content_plain,
         answer=q.answer, explanation=q.explanation, source=q.source,
         is_deleted=q.is_deleted, created_at=q.created_at, updated_at=q.updated_at,
-        subject_name=subject.name if subject else "",
-        subject_color=subject.color if subject else "",
-        type_name=qtype.name if qtype else "",
+        subject_name=q.subject.name if q.subject else "",
+        subject_color=q.subject.color if q.subject else "",
+        type_name=q.question_type.name if q.question_type else "",
         tag_ids=[t.id for t in q.tags],
         tag_names=[t.name for t in q.tags],
         **stats,

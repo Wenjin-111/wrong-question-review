@@ -38,14 +38,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = localStorage.getItem('access_token');
     if (token) {
+      const cached = localStorage.getItem('user');
+      if (cached) {
+        try { dispatch({ type: 'LOGIN', user: JSON.parse(cached) }); }
+        catch { /* ignore parse error */ }
+      }
       authApi
         .me()
         .then((res) => {
-          dispatch({ type: 'LOGIN', user: res.data });
+          const user = res.data;
+          localStorage.setItem('user', JSON.stringify(user));
+          dispatch({ type: 'LOGIN', user });
         })
         .catch(() => {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
           dispatch({ type: 'LOGOUT' });
         });
     } else {
@@ -56,12 +64,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = (tokenData: { access_token: string; refresh_token: string; user: User }) => {
     localStorage.setItem('access_token', tokenData.access_token);
     localStorage.setItem('refresh_token', tokenData.refresh_token);
+    localStorage.setItem('user', JSON.stringify(tokenData.user));
     dispatch({ type: 'LOGIN', user: tokenData.user });
   };
 
   const logout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
     dispatch({ type: 'LOGOUT' });
   };
 

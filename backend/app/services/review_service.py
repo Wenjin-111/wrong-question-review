@@ -141,7 +141,7 @@ def submit_answer(db: Session, user_id: int, session_id: int, question_id: int, 
 
     # Second call: is_correct provided → save the record
     record = ReviewRecord(
-        user_id=user_id, question_id=question_id,
+        user_id=user_id, question_id=question_id, session_id=session_id,
         is_correct=is_correct,
         user_answer=user_answer,
         review_mode=session.review_mode,
@@ -155,12 +155,11 @@ def submit_answer(db: Session, user_id: int, session_id: int, question_id: int, 
             .order_by(ReviewRecord.created_at.desc())
             .first()
         )
+        last_stage = last_record.sr_stage if last_record else 0
         if is_correct:
-            current_stage = (last_record.sr_stage or 0) + 1
-            record.sr_stage = min(current_stage, len(intervals))
+            record.sr_stage = min(last_stage + 1, len(intervals))
         else:
-            current_stage = last_record.sr_stage or 1
-            record.sr_stage = max(1, current_stage - 2)
+            record.sr_stage = max(1, last_stage - 2)
         idx = min(record.sr_stage - 1, len(intervals) - 1)
         record.sr_next_review = datetime.utcnow() + timedelta(minutes=intervals[idx])
 
@@ -192,7 +191,12 @@ def get_session_summary(db: Session, user_id: int, session_id: int) -> dict:
     session = db.query(ReviewSession).filter(ReviewSession.id == session_id, ReviewSession.user_id == user_id).first()
     if not session:
         raise ValueError("会话不存在")
-    records = db.query(ReviewRecord).filter(ReviewRecord.user_id == user_id).order_by(ReviewRecord.created_at.desc()).limit(session.total_count).all()
+    records = (
+        db.query(ReviewRecord)
+        .filter(ReviewRecord.session_id == session_id, ReviewRecord.user_id == user_id)
+        .order_by(ReviewRecord.created_at.desc())
+        .all()
+    )
     questions_data = []
     for r in records:
         q = db.query(Question).filter(Question.id == r.question_id).first()

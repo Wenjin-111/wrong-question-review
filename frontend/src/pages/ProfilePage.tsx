@@ -20,9 +20,11 @@ export default function ProfilePage() {
       const { data } = await settingsApi.uploadAvatar(file);
       const url = data.avatar_url || (data.data && data.data.avatar_url);
       if (user && url) {
+        const updatedUser = { ...user, avatar_url: url };
         const token = localStorage.getItem('access_token') || '';
         const refresh = localStorage.getItem('refresh_token') || '';
-        login({ access_token: token, refresh_token: refresh, user: { ...user, avatar_url: url } });
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        login({ access_token: token, refresh_token: refresh, user: updatedUser });
       }
       message.success('头像已更新');
     } catch (err: any) { message.error(err?.response?.data?.detail || '上传失败'); }
