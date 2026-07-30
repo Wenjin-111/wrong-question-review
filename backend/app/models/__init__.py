@@ -11,7 +11,11 @@ from app.models.user_config import UserConfig
 from app.models.review_session import ReviewSession
 from app.models.ai_chat_message import AiChatMessage
 from app.models.chat_session import ChatSession
+from app.models.daily_streak import DailyStreak
+from app.models.question_note import QuestionNote
+from app.models.fsrs_state import FsrsState
 
 __all__ = ["User", "Subject", "QuestionType", "Question", "Tag", "QuestionTag",
            "QuestionImage", "ReviewRecord", "QuestionDraft", "UserConfig",
-           "ReviewSession", "AiChatMessage", "ChatSession"]
+           "ReviewSession", "AiChatMessage", "ChatSession", "DailyStreak",
+           "QuestionNote", "FsrsState"]

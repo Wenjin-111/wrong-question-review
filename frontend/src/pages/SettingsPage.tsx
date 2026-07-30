@@ -300,43 +300,63 @@ function TagsTab() {
 }
 
 function SpacedTab() {
-  const [intervals, setIntervals] = useState<number[]>([]);
+  const [retention, setRetention] = useState(90);
   const [saving, setSaving] = useState(false);
-  const defaults = [20, 60, 1440, 2880, 8640, 44640];
 
   useEffect(() => {
-    settingsApi.getSpacedIntervals().then(({ data }) => {
-      setIntervals((data.data || data).intervals || defaults);
+    settingsApi.getFsrsRetention().then(({ data }) => {
+      const v = (data.data || data).retention;
+      if (v) setRetention(Math.round(v * 100));
     }).catch(() => {});
   }, []);
 
   const save = async () => {
     setSaving(true);
-    try { await settingsApi.updateSpacedIntervals(intervals); message.success('已保存'); }
+    try { await settingsApi.updateFsrsRetention(retention / 100); message.success('已保存'); }
     catch { message.error('保存失败'); }
     finally { setSaving(false); }
   };
 
-  const fmt = (m: number) => m < 60 ? `${m} 分钟` : m < 1440 ? `${Math.round(m / 60)} 小时` : `${Math.round(m / 1440)} 天`;
-
   return (
     <Card className="card-elevated" style={{ borderRadius: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Text strong style={{ fontSize: 16 }}>遗忘曲线间隔</Text>
-        <Space>
-          <Button onClick={() => setIntervals(defaults)}>重置默认</Button>
-          <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>保存</Button>
-        </Space>
+        <Text strong style={{ fontSize: 16 }}>FSRS 目标保留率</Text>
+        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>保存</Button>
       </div>
-      <Text className="text-secondary" style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>修改后仅对后续完成的题目生效</Text>
-      {intervals.map((v, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <Text strong style={{ minWidth: 60 }}>阶段 {i + 1}</Text>
-          <InputNumber value={v} onChange={(n) => { const a = [...intervals]; a[i] = n || 0; setIntervals(a); }} min={1} style={{ width: 120 }} addonAfter="分钟" />
-          <Text className="text-tertiary">{fmt(v)}</Text>
+      <Text className="text-secondary" style={{ fontSize: 13, display: 'block', marginBottom: 16 }}>
+        FSRS（Free Spaced Repetition Scheduler）是目前最先进的间隔复习算法。它根据你每次答题的评分，
+        动态计算每道题的<b>稳定性</b>和<b>难度</b>，自动安排最优复习时间。
+      </Text>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+        <InputNumber value={retention} onChange={(v) => setRetention(v || 90)} min={70} max={99} step={1}
+          style={{ width: 100 }} addonAfter="%" />
+        <Text className="text-secondary" style={{ fontSize: 13 }}>
+          {retention >= 95 ? '高频复习，记忆牢固但题量大' : retention >= 85 ? '平衡模式，推荐' : '低频复习，适合题目很多的场景'}
+        </Text>
+      </div>
+
+      <div style={{ padding: 16, background: 'rgba(242,242,247,0.5)', borderRadius: 12, marginBottom: 16 }}>
+        <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>算法原理</Text>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[
+            { label: '稳定性 (Stability)', desc: '记忆的牢固程度。值越大，下次复习间隔越长。答对上升，答错骤降。' },
+            { label: '难度 (Difficulty)', desc: '题目对你有多难 (0-1)。影响稳定性增长速度，难题涨得慢。' },
+            { label: '可提取性 (Retrievability)', desc: '当前还记得这道题的概率。降到低于目标保留率时触发复习。' },
+            { label: '评分映射', desc: '完全忘了→1 · 勉强想起→2 · 顺利答对→3 · 太简单了→4。评分越高稳定性增长越快。' },
+          ].map((item) => (
+            <div key={item.label} style={{ display: 'flex', gap: 8 }}>
+              <Text strong style={{ fontSize: 13, minWidth: 140, color: '#007AFF' }}>{item.label}</Text>
+              <Text style={{ fontSize: 13, color: '#1D1D1F' }}>{item.desc}</Text>
+            </div>
+          ))}
         </div>
-      ))}
-      <Button type="dashed" icon={<PlusOutlined />} onClick={() => setIntervals([...intervals, 10080])} block style={{ marginTop: 8 }}>添加阶段</Button>
+      </div>
+
+      <div style={{ padding: 12, background: 'rgba(242,242,247,0.4)', borderRadius: 10 }}>
+        <Text className="text-tertiary" style={{ fontSize: 12 }}>
+          常用参考：语言学习 90-95% · 考试备考 85-90% · 知识回顾 80-85%
+        </Text>
+      </div>
     </Card>
   );
 }

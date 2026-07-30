@@ -1,10 +1,9 @@
 from pydantic import BaseModel, EmailStr, field_validator
-import re
 
 
 class RegisterRequest(BaseModel):
     username: str
-    email: str
+    email: EmailStr
     password: str
     confirm_password: str
 
@@ -13,14 +12,6 @@ class RegisterRequest(BaseModel):
     def username_valid(cls, v: str) -> str:
         if len(v) < 2 or len(v) > 20:
             raise ValueError("用户名长度必须在 2-20 字符之间")
-        return v
-
-    @field_validator("email")
-    @classmethod
-    def email_valid(cls, v: str) -> str:
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(pattern, v):
-            raise ValueError("邮箱格式不正确")
         return v
 
     @field_validator("password")

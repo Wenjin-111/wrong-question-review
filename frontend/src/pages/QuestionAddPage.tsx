@@ -1,17 +1,50 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { Card, Form, Select, Input, Button, message, Row, Col, Typography, Radio, Checkbox, Space, Divider } from 'antd';
+import { Card, Form, Select, Input, Button, message, Row, Col, Typography, Radio, Checkbox, Space, Divider, Segmented } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { subjectsApi } from '../api/subjects';
 import { tagsApi } from '../api/tags';
 import { questionsApi, type QuestionData } from '../api/questions';
 import { draftApi } from '../api/draft';
-import TiptapEditor from '../components/richEditor/TiptapEditor';
-import TiptapViewer from '../components/richEditor/TiptapViewer';
+import MarkdownEditor from '../components/richEditor/MarkdownEditor';
+import { renderMarkdown } from '../utils/markdown';
 import type { Subject, Tag as TagType } from '../types';
 import { CameraOutlined, SaveOutlined, FilePdfOutlined } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
+
+const EditorSegment = memo(({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) => {
+  const [mode, setMode] = useState<'edit' | 'preview'>('edit');
+  return (
+    <div>
+      <Segmented
+        size="small"
+        value={mode}
+        onChange={(val) => setMode(val as 'edit' | 'preview')}
+        options={[
+          { label: '编辑', value: 'edit' },
+          { label: '预览', value: 'preview' },
+        ]}
+        style={{ marginBottom: 8 }}
+      />
+      {mode === 'edit' ? (
+        <MarkdownEditor value={value} onChange={onChange} placeholder={placeholder} />
+      ) : (
+        <div className="markdown-preview"
+          style={{
+            fontSize: 15, lineHeight: 1.8, padding: '12px 16px',
+            border: '1px solid rgba(60,60,67,0.10)', borderRadius: 8,
+            minHeight: 300, maxHeight: 500, overflow: 'auto', background: '#fafafa',
+          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }} />
+      )}
+    </div>
+  );
+});
 
 export default function QuestionAddPage() {
   const navigate = useNavigate();
@@ -267,7 +300,7 @@ export default function QuestionAddPage() {
               </Row>
 
               <Form.Item label="题目内容" required>
-                <TiptapEditor value={content} onChange={setContent} placeholder="输入题目内容..." />
+                <EditorSegment value={content} onChange={setContent} placeholder="输入题目内容..." />
               </Form.Item>
 
               {/* Answer section */}
@@ -327,12 +360,12 @@ export default function QuestionAddPage() {
 
               {answerType === 'subjective' && (
                 <Form.Item label="参考答案">
-                  <TiptapEditor value={referenceAnswer} onChange={setReferenceAnswer} placeholder="参考答案（供自评参考）" />
+                  <EditorSegment value={referenceAnswer} onChange={setReferenceAnswer} placeholder="参考答案（供自评参考）" />
                 </Form.Item>
               )}
 
               <Form.Item label="解析（选填）">
-                <TiptapEditor value={explanation} onChange={setExplanation} placeholder="解题思路、知识点讲解..." />
+                <EditorSegment value={explanation} onChange={setExplanation} placeholder="解题思路、知识点讲解..." />
               </Form.Item>
 
               <Row gutter={16}>
@@ -353,10 +386,12 @@ export default function QuestionAddPage() {
         </Col>
 
         <Col xs={24} lg={10}>
-          <Card className="card-elevated" style={{ borderRadius: 14, position: 'sticky', top: 80 }}
+          <Card className="card-elevated" style={{ borderRadius: 14, position: 'sticky', top: 80, maxHeight: 'calc(100vh - 120px)', overflow: 'auto' }}
             title={<Text strong>实时预览</Text>}>
             {content ? (
-              <TiptapViewer content={content} />
+              <div className="markdown-preview"
+                style={{ fontSize: 15, lineHeight: 1.8 }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
             ) : (
               <Text className="text-tertiary" style={{ fontSize: 14 }}>在左侧输入题目内容后，这里会实时显示预览效果</Text>
             )}
@@ -364,7 +399,9 @@ export default function QuestionAddPage() {
               <>
                 <Divider />
                 <Text strong style={{ fontSize: 13, color: '#007AFF' }}>解析</Text>
-                <TiptapViewer content={explanation} />
+                <div className="markdown-preview"
+                  style={{ fontSize: 14, lineHeight: 1.7, marginTop: 8 }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(explanation) }} />
               </>
             )}
           </Card>

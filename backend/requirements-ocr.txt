@@ -4,5 +4,6 @@
 paddleocr==2.9.*
 paddlepaddle==3.0.*
 pymupdf==1.25.*
-weasyprint==63.*
+fpdf2==2.8.*
 pillow==11.1.*
+numpy>=1.24,<3

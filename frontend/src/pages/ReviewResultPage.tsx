@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Card, Typography, Button, Row, Col, Space, Tag } from 'antd';
+import { Card, Typography, Button, Row, Col, Space } from 'antd';
 import { ReloadOutlined, HomeOutlined, CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
 import { reviewApi } from '../api/review';
+import { renderMarkdown } from '../utils/markdown';
 
 const { Title, Text } = Typography;
 
@@ -77,7 +78,8 @@ export default function ReviewResultPage() {
                 }
                 <div>
                   <Text>{`第 ${i + 1} 题`}</Text>
-                  <Text className="text-secondary" style={{ fontSize: 13, display: 'block' }}>{q.content?.replace(/<[^>]+>/g, '').slice(0, 80)}</Text>
+                  <div className="markdown-body" style={{ fontSize: 13, lineHeight: 1.5 }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(q.content || '') }} />
                 </div>
               </div>
             ))}

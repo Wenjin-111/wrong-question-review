@@ -8,10 +8,12 @@ class ReviewSession(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("user.id", ondelete="CASCADE"), nullable=False)
-    review_mode = Column(Enum("free", "spaced"), nullable=False)
+    review_mode = Column(Enum("free", "spaced", "select"), nullable=False)
     subject_ids = Column(JSON, nullable=False)
+    question_ids = Column(JSON, nullable=True)
     total_count = Column(Integer, nullable=False)
     correct_count = Column(Integer, nullable=False, default=0)
     wrong_count = Column(Integer, nullable=False, default=0)
+    current_index = Column(Integer, nullable=False, default=0)
     started_at = Column(DateTime, nullable=False, server_default=func.now())
     finished_at = Column(DateTime, nullable=True)

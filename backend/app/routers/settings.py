@@ -16,8 +16,8 @@ from app.utils.security import encrypt_api_key, decrypt_api_key
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
-class SpacedIntervalsRequest(BaseModel):
-    intervals: list[int]
+class FsrsRetentionRequest(BaseModel):
+    retention: float
 
 
 class AiConfigRequest(BaseModel):
@@ -46,20 +46,19 @@ def _get_or_create_config(db: Session, user_id: int, key: str, default: str = ""
     return config
 
 
-@router.get("/spaced-intervals")
-def get_spaced_intervals(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    import json
-    config = _get_or_create_config(db, current_user.id, "spaced_intervals", "[20, 60, 1440, 2880, 8640, 44640]")
-    return {"intervals": json.loads(config.config_value)}
+@router.get("/fsrs-retention")
+def get_fsrs_retention(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    config = _get_or_create_config(db, current_user.id, "fsrs_retention", "0.90")
+    return {"retention": float(config.config_value)}
 
 
-@router.put("/spaced-intervals")
-def update_spaced_intervals(req: SpacedIntervalsRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    import json
-    config = _get_or_create_config(db, current_user.id, "spaced_intervals")
-    config.config_value = json.dumps(req.intervals)
+@router.put("/fsrs-retention")
+def update_fsrs_retention(req: FsrsRetentionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    config = _get_or_create_config(db, current_user.id, "fsrs_retention")
+    retention = max(0.70, min(0.99, req.retention))
+    config.config_value = str(retention)
     db.commit()
-    return {"ok": True}
+    return {"retention": retention}
 
 
 @router.get("/ai-config")

@@ -10,6 +10,11 @@ from app.services import review_service
 router = APIRouter(prefix="/api/review", tags=["review"])
 
 
+@router.get("/sessions")
+def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return review_service.list_user_sessions(db, current_user.id)
+
+
 @router.post("/sessions")
 def create_session(req: CreateSessionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
@@ -27,6 +32,14 @@ def get_session(session_id: int, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+@router.get("/sessions/{session_id}/resume")
+def resume_session(session_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    try:
+        return review_service.get_session_for_resume(db, current_user.id, session_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 @router.post("/sessions/{session_id}/submit")
 def submit_answer(
     session_id: int,
@@ -36,7 +49,8 @@ def submit_answer(
 ):
     try:
         return review_service.submit_answer(
-            db, current_user.id, session_id, req.question_id, req.user_answer, req.is_correct,
+            db, current_user.id, session_id, req.question_id,
+            req.user_answer, req.is_correct, req.current_index, req.rating,
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

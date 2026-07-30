@@ -37,7 +37,11 @@ export default function ProfilePage() {
     try {
       await settingsApi.updateUserInfo(values);
       if (user && values.username) {
-        login({ access_token: localStorage.getItem('access_token')!, refresh_token: localStorage.getItem('refresh_token')!, user: { ...user, username: values.username, email: values.email || user.email } });
+        const at = localStorage.getItem('access_token');
+        const rt = localStorage.getItem('refresh_token');
+        if (at && rt) {
+          login({ access_token: at, refresh_token: rt, user: { ...user, username: values.username, email: values.email || user.email } });
+        }
       }
       message.success('已保存');
     } catch (err: any) { message.error(err.response?.data?.detail || '保存失败'); }

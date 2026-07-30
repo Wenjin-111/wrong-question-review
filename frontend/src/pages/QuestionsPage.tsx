@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Table, Input, Select, Button, Space, Popconfirm, message, Tag, Typography } from 'antd';
 import { PlusOutlined, SearchOutlined, DeleteOutlined, EyeOutlined, EditOutlined, DownloadOutlined } from '@ant-design/icons';
@@ -39,16 +39,24 @@ export default function QuestionsPage() {
   const [tags, setTags] = useState<TagType[]>([]);
   const [filters, setFilters] = useState<Record<string, string | undefined>>({});
   const [keyword, setKeyword] = useState('');
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const handleKeywordChange = (value: string) => {
+    setKeyword(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedKeyword(value), 400);
+  };
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const { data: res } = await questionsApi.list({
         ...filters,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         page,
-        page_size: 20,
+        page_size: 10,
       });
       setData(res.items || []);
       setTotal(res.total || 0);
@@ -56,7 +64,7 @@ export default function QuestionsPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [page, filters]);
+  useEffect(() => { fetchData(); }, [page, filters, debouncedKeyword]);
 
   useEffect(() => {
     subjectsApi.list().then(({ data }) => setSubjects(data)).catch(() => {});
@@ -161,12 +169,11 @@ export default function QuestionsPage() {
 
       <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
         <Space wrap size={12}>
-          <Input
-            prefix={<SearchOutlined style={{ color: '#86868B' }} />}
+          <Input.Search
             placeholder="搜索题目..."
             value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            onPressEnter={fetchData}
+            onChange={(e) => handleKeywordChange(e.target.value)}
+            onSearch={() => { if (debounceRef.current) { clearTimeout(debounceRef.current); setDebouncedKeyword(keyword); } }}
             style={{ width: 220 }}
             allowClear
           />
@@ -207,7 +214,7 @@ export default function QuestionsPage() {
           loading={loading}
           rowSelection={{ selectedRowKeys: selectedIds, onChange: (keys) => setSelectedIds(keys as number[]) }}
           pagination={{
-            current: page, total, pageSize: 20, showTotal: (t) => `共 ${t} 题`,
+            current: page, total, pageSize: 10, showTotal: (t) => `共 ${t} 题`,
             onChange: (p) => setPage(p),
           }}
           size="middle"

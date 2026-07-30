@@ -1,8 +1,8 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from datetime import datetime
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -12,6 +12,7 @@ from app.models.question import Question
 from app.models.chat_session import ChatSession
 from app.models.ai_chat_message import AiChatMessage
 from app.services.ai_service import call_ai
+from app.utils.shared import get_user_config
 
 router = APIRouter(prefix="/api/chat", tags=["ai_chat"])
 
@@ -36,15 +37,33 @@ def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(ge
         .order_by(ChatSession.updated_at.desc())
         .all()
     )
+
+    if not sessions:
+        return []
+
+    # Batch-load questions and last messages
+    qids = {s.question_id for s in sessions if s.question_id}
+    questions_map = {
+        q.id: q
+        for q in db.query(Question).filter(Question.id.in_(qids)).all()
+    } if qids else {}
+
+    sids = [s.id for s in sessions]
+    last_msgs = (
+        db.query(AiChatMessage)
+        .filter(AiChatMessage.session_id.in_(sids), AiChatMessage.role != "system")
+        .order_by(AiChatMessage.created_at.desc())
+        .all()
+    )
+    last_msg_map = {}
+    for m in last_msgs:
+        if m.session_id not in last_msg_map:
+            last_msg_map[m.session_id] = m
+
     result = []
     for s in sessions:
-        q = db.query(Question).filter(Question.id == s.question_id).first() if s.question_id else None
-        last_msg = (
-            db.query(AiChatMessage)
-            .filter(AiChatMessage.session_id == s.id, AiChatMessage.role != "system")
-            .order_by(AiChatMessage.created_at.desc())
-            .first()
-        )
+        q = questions_map.get(s.question_id)
+        last_msg = last_msg_map.get(s.id)
         result.append({
             "id": s.id,
             "question_id": s.question_id,
@@ -59,7 +78,6 @@ def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(ge
 
 @router.post("/sessions", status_code=status.HTTP_201_CREATED)
 def create_session(req: CreateSessionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    q = None
     if req.question_id:
         q = db.query(Question).filter(Question.id == req.question_id, Question.user_id == current_user.id).first()
         if not q:
@@ -85,7 +103,7 @@ def bind_question(session_id: int, req: BindQuestionRequest, db: Session = Depen
         s.question_id = q.id
     else:
         s.question_id = None
-    s.updated_at = datetime.utcnow()
+    s.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     return {"id": s.id, "question_id": s.question_id, "title": s.title}
 
@@ -121,14 +139,15 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
 
     question = db.query(Question).filter(Question.id == s.question_id).first() if s.question_id else None
 
-    api_url = _get_config(db, current_user.id, "ai_api_url")
-    api_key = _get_config(db, current_user.id, "ai_api_key")
-    model = _get_config(db, current_user.id, "ai_model") or "gpt-4o"
+    api_url = get_user_config(db, current_user.id, "ai_api_url")
+    api_key = get_user_config(db, current_user.id, "ai_api_key")
+    model = get_user_config(db, current_user.id, "ai_model") or "gpt-4o"
 
     if not api_url or not api_key:
         raise HTTPException(status_code=400, detail="请先在设置中配置 AI API")
 
     from app.utils.security import decrypt_api_key
+
     decrypted_key = decrypt_api_key(api_key)
 
     history = (
@@ -156,7 +175,7 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
 
     db.add(AiChatMessage(user_id=uid, question_id=qid, session_id=sid, role="user", content=req.message))
     api_messages.append({"role": "user", "content": req.message})
-    s.updated_at = datetime.utcnow()
+    s.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     if s.title == "新对话":
         s.title = req.message[:30] + ("..." if len(req.message) > 30 else "")
     db.commit()
@@ -173,11 +192,19 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
                     yield f"data: {chunk}\n\n"
 
                 if full:
+                    # Use a fresh DB session to save the AI response
                     from app.database import SessionLocal
                     save_db = SessionLocal()
                     try:
-                        save_db.add(AiChatMessage(user_id=uid, question_id=qid, session_id=sid, role="assistant", content=full))
+                        assistant_msg = AiChatMessage(
+                            user_id=uid, question_id=qid, session_id=sid,
+                            role="assistant", content=full,
+                        )
+                        save_db.add(assistant_msg)
                         save_db.commit()
+                    except Exception:
+                        save_db.rollback()
+                        yield "data: [ERROR] 保存AI回复失败，请刷新页面重试\n\n"
                     finally:
                         save_db.close()
 
@@ -186,9 +213,3 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
             yield f"data: [ERROR] {str(e)}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
-
-
-def _get_config(db: Session, user_id: int, key: str) -> str | None:
-    from app.models.user_config import UserConfig
-    config = db.query(UserConfig).filter(UserConfig.user_id == user_id, UserConfig.config_key == key).first()
-    return config.config_value if config else None

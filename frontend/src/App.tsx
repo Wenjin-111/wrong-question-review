@@ -18,7 +18,9 @@ import StatsPage from './pages/StatsPage';
 import ProfilePage from './pages/ProfilePage';
 import DraftBoxPage from './pages/DraftBoxPage';
 import PDFImportPage from './pages/PDFImportPage';
+import BatchEditPage from './pages/BatchEditPage';
 import AIChatPage from './pages/AIChatPage';
+import SelectQuestionsPage from './pages/SelectQuestionsPage';
 import appleTheme from './styles/theme';
 
 export default function App() {
@@ -37,10 +39,12 @@ export default function App() {
                   <Route path="/questions/add" element={<QuestionAddPage />} />
                   <Route path="/questions/ocr" element={<OCREntryPage />} />
 <Route path="/questions/pdf" element={<PDFImportPage />} />
+                  <Route path="/questions/batch-edit" element={<BatchEditPage />} />
                   <Route path="/questions/:id" element={<QuestionDetailPage />} />
                   <Route path="/review" element={<ReviewCenterPage />} />
                   <Route path="/review/session" element={<ReviewSessionPage />} />
                   <Route path="/review/result" element={<ReviewResultPage />} />
+                  <Route path="/review/select" element={<SelectQuestionsPage />} />
                   <Route path="/stats" element={<StatsPage />} />
                   <Route path="/settings" element={<SettingsPage />} />
 <Route path="/profile" element={<ProfilePage />} />

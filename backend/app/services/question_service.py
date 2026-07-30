@@ -1,20 +1,14 @@
-import re
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
-from sqlalchemy import func, or_, text, desc, asc, Integer, cast, Date
+from sqlalchemy import func, or_, text, desc, asc, Integer, cast, Date, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.question import Question
 from app.models.tag import Tag
 from app.models.question_tag import QuestionTag
 from app.models.review_record import ReviewRecord
-
-
-def strip_html(html: str) -> str:
-    clean = re.sub(r"<[^>]+>", " ", html or "")
-    clean = re.sub(r"\s+", " ", clean).strip()
-    return clean
+from app.utils.shared import strip_html
 
 
 def build_question_query(db: Session, user_id: int, params: dict):
@@ -28,13 +22,13 @@ def build_question_query(db: Session, user_id: int, params: dict):
         q = q.filter(Question.question_type_id.in_(ids))
     if params.get("tag_id"):
         ids = [int(x) for x in params["tag_id"].split(",")]
-        q = q.join(QuestionTag).filter(QuestionTag.tag_id.in_(ids))
+        q = q.filter(Question.id.in_(select(QuestionTag.question_id).where(QuestionTag.tag_id.in_(ids))))
     if params.get("keyword"):
         kw = params["keyword"]
         if len(kw) >= 2:
             q = q.filter(
                 or_(
-                    func.match(Question.content_plain, kw).bool(),
+                    Question.content_plain.match(kw),
                     Question.content_plain.like(f"%{kw}%"),
                 )
             )
@@ -119,7 +113,7 @@ def update_question(db: Session, q: Question, data: dict) -> Question:
         db.query(QuestionTag).filter(QuestionTag.question_id == q.id).delete()
         for tag_id in data["tag_ids"]:
             db.add(QuestionTag(question_id=q.id, tag_id=tag_id))
-    q.updated_at = datetime.utcnow()
+    q.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(q)
     return q
@@ -127,26 +121,34 @@ def update_question(db: Session, q: Question, data: dict) -> Question:
 
 def soft_delete_question(db: Session, q: Question):
     q.is_deleted = True
-    q.updated_at = datetime.utcnow()
+    q.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
 
 def batch_delete_questions(db: Session, user_id: int, ids: list[int]) -> int:
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     count = (
         db.query(Question)
         .filter(Question.id.in_(ids), Question.user_id == user_id, Question.is_deleted == False)
-        .update({"is_deleted": True, "updated_at": datetime.utcnow()}, synchronize_session=False)
+        .update({"is_deleted": True, "updated_at": now}, synchronize_session=False)
     )
     db.commit()
     return count
 
 
 def batch_update_tags(db: Session, user_id: int, ids: list[int], tag_ids: list[int]):
-    questions = db.query(Question).filter(Question.id.in_(ids), Question.user_id == user_id).all()
-    for q in questions:
-        db.query(QuestionTag).filter(QuestionTag.question_id == q.id).delete()
-        for tag_id in tag_ids:
-            db.add(QuestionTag(question_id=q.id, tag_id=tag_id))
+    # Verify ownership
+    count = db.query(Question).filter(Question.id.in_(ids), Question.user_id == user_id).count()
+    if count != len(ids):
+        return
+
+    # Bulk delete all old tags, then bulk insert new ones
+    db.query(QuestionTag).filter(QuestionTag.question_id.in_(ids)).delete(synchronize_session=False)
+    if tag_ids:
+        db.execute(
+            QuestionTag.__table__.insert(),
+            [{"question_id": qid, "tag_id": tid} for qid in ids for tid in tag_ids],
+        )
     db.commit()
 
 

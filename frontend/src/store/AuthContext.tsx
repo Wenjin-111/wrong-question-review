@@ -29,7 +29,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 const AuthContext = createContext<{
   state: AuthState;
   login: (tokenData: { access_token: string; refresh_token: string; user: User }) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 } | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -40,8 +40,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       const cached = localStorage.getItem('user');
       if (cached) {
-        try { dispatch({ type: 'LOGIN', user: JSON.parse(cached) }); }
-        catch { /* ignore parse error */ }
+        try {
+          dispatch({ type: 'LOGIN', user: JSON.parse(cached) });
+        } catch {
+          localStorage.removeItem('user');
+        }
       }
       authApi
         .me()
@@ -68,7 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'LOGIN', user: tokenData.user });
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try { await authApi.logout(); } catch {}
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');

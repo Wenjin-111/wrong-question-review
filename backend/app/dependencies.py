@@ -28,6 +28,9 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已禁用")
 
     token_ver = payload.get("ver")
+    token_fam = payload.get("fam")
     if token_ver is None or token_ver != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token 已失效，请重新登录")
+    if token_fam is None or token_fam != user.token_family:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token 已失效，请重新登录")
     return user

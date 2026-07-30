@@ -1,11 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { Card, Typography, Button, Input, Select, Popconfirm, message } from 'antd';
 import { SendOutlined, RobotOutlined, UserOutlined, PlusOutlined, DeleteOutlined, MessageOutlined } from '@ant-design/icons';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
 import { subjectsApi } from '../api/subjects';
 import { questionsApi } from '../api/questions';
 import { chatApi } from '../api/chat';
+import { renderMarkdown } from '../utils/markdown';
+import { streamSSE } from '../utils/sse';
 
 const { Text } = Typography;
 
@@ -21,68 +21,6 @@ interface Session {
   question_preview: string;
   last_message: string;
   updated_at: string;
-}
-
-function renderLatex(text: string): string {
-  // Display math: \[ ... \]
-  text = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, formula) => {
-    try { return katex.renderToString(formula.trim(), { displayMode: true, throwOnError: false }); }
-    catch { return `<pre>${formula}</pre>`; }
-  });
-  // Inline math: \( ... \)
-  text = text.replace(/\\\(([\s\S]*?)\\\)/g, (_, formula) => {
-    try { return katex.renderToString(formula.trim(), { displayMode: false, throwOnError: false }); }
-    catch { return formula; }
-  });
-  return text;
-}
-
-function renderMarkdown(text: string): string {
-  const lines = text.split('\n');
-  const result: string[] = [];
-  let inList = false;
-  let listType = '';
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      if (inList) { result.push(listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-      continue;
-    }
-    if (/^#{1,4} /.test(trimmed)) {
-      if (inList) { result.push(listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-      const m = trimmed.match(/^(#{1,4}) (.+)/);
-      if (m) result.push(`<h${m[1].length + 2}>${renderLatex(_fmt(m[2]))}</h${m[1].length + 2}>`);
-      continue;
-    }
-    const ulMatch = trimmed.match(/^[-*] (.+)/);
-    if (ulMatch) {
-      if (!inList || listType !== 'ul') {
-        if (inList) result.push(listType === 'ul' ? '</ul>' : '</ol>');
-        result.push('<ul>'); listType = 'ul'; inList = true;
-      }
-      result.push(`<li>${renderLatex(_fmt(ulMatch[1]))}</li>`);
-      continue;
-    }
-    const olMatch = trimmed.match(/^\d+\. (.+)/);
-    if (olMatch) {
-      if (!inList || listType !== 'ol') {
-        if (inList) result.push(listType === 'ul' ? '</ul>' : '</ol>');
-        result.push('<ol>'); listType = 'ol'; inList = true;
-      }
-      result.push(`<li>${renderLatex(_fmt(olMatch[1]))}</li>`);
-      continue;
-    }
-    if (inList) { result.push(listType === 'ul' ? '</ul>' : '</ol>'); inList = false; }
-    result.push(`<p>${renderLatex(_fmt(trimmed))}</p>`);
-  }
-  if (inList) result.push(listType === 'ul' ? '</ul>' : '</ol>');
-  return result.join('\n');
-}
-
-function _fmt(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
 }
 
 export default function AIChatPage() {
@@ -143,8 +81,6 @@ export default function AIChatPage() {
     try {
       await chatApi.bindQuestion(activeSid, questionId);
       setActiveQid(questionId);
-      const session = sessions.find((s) => s.id === activeSid);
-      // Clear messages to rebuild system prompt with new context
       setMessages([]);
       fetchSessions();
     } catch { message.error('绑定失败'); }
@@ -166,38 +102,26 @@ export default function AIChatPage() {
     setIsStreaming(true);
     setStreaming('');
 
-    try {
-      const token = localStorage.getItem('access_token') || '';
-      const resp = await fetch(`http://localhost:8000/api/chat/sessions/${activeSid}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ message: userMsg }),
-      });
-      const reader = resp.body?.getReader();
-      const decoder = new TextDecoder();
-      let full = '', buf = '';
-      while (reader) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const parts = buf.split('\n\n');
-        buf = parts.pop() || '';
-        for (const part of parts) {
-          for (const line of part.split('\n')) {
-            if (!line.startsWith('data: ')) continue;
-            const c = line.slice(6);
-            if (c === '[DONE]') break;
-            if (c.startsWith('[ERROR]')) { full += '\n\n*错误: ' + c.slice(7) + '*'; break; }
-            full += c;
-            setStreaming(full);
+    await streamSSE(
+      `/chat/sessions/${activeSid}/send`,
+      { message: userMsg },
+      {
+        onToken: (full) => setStreaming(full),
+        onDone: (full) => {
+          if (full) {
+            setMessages((prev) => [...prev, { role: 'assistant', content: full }]);
+            setStreaming('');
           }
-        }
-      }
-      if (full) { setMessages((prev) => [...prev, { role: 'assistant', content: full }]); setStreaming(''); }
-      fetchSessions();
-    } catch {
-      setMessages((prev) => [...prev, { role: 'assistant', content: '请求失败' }]); setStreaming('');
-    } finally { setIsStreaming(false); }
+          fetchSessions();
+        },
+        onError: (err) => {
+          setMessages((prev) => [...prev, { role: 'assistant', content: `请求失败: ${err}` }]);
+          setStreaming('');
+        },
+      },
+    );
+
+    setIsStreaming(false);
   };
 
   return (
@@ -219,6 +143,9 @@ export default function AIChatPage() {
             sessions.map((s) => (
               <div key={s.id}
                 onClick={() => loadSession(s.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') loadSession(s.id); }}
                 style={{
                   padding: '12px 14px', cursor: 'pointer', borderBottom: '1px solid rgba(60,60,67,0.04)',
                   background: activeSid === s.id ? 'rgba(0,122,255,0.06)' : 'transparent',

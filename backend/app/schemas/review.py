@@ -7,6 +7,7 @@ class CreateSessionRequest(BaseModel):
     subject_ids: list[int] = []
     type_ids: list[int] = []
     tag_ids: list[int] = []
+    question_ids: list[int] = []
     min_accuracy: int = 0
     limit: int = 20
     order: str = "random"
@@ -16,6 +17,8 @@ class SubmitAnswerRequest(BaseModel):
     question_id: int
     user_answer: str
     is_correct: bool | None = None  # Only for self-evaluation (subjective)
+    current_index: int = 0
+    rating: int | None = None  # FSRS rating 1-4 (Again/Hard/Good/Easy)
 
 
 class SessionOut(BaseModel):

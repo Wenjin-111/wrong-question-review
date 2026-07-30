@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Card, Typography, Tag, Space, Button, Descriptions, Empty, Spin } from 'antd';
-import { EditOutlined, ArrowLeftOutlined } from '@ant-design/icons';
+import { Card, Typography, Tag, Space, Button, Descriptions, Empty, Popconfirm, message, Skeleton } from 'antd';
+import { EditOutlined, ArrowLeftOutlined, PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { questionsApi } from '../api/questions';
-import TiptapViewer from '../components/richEditor/TiptapViewer';
+import { notesApi } from '../api/notes';
+import MarkdownViewer from '../components/common/MarkdownViewer';
+import MarkdownEditor from '../components/richEditor/MarkdownEditor';
 import dayjs from 'dayjs';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface QuestionDetail {
   id: number;
@@ -31,16 +33,73 @@ export default function QuestionDetailPage() {
   const [question, setQuestion] = useState<QuestionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAnswer, setShowAnswer] = useState(false);
+  const [notes, setNotes] = useState<{ id: number; content: string; updated_at: string }[]>([]);
+  const [newNote, setNewNote] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+
+  const qid = Number(id);
 
   useEffect(() => {
     if (!id) return;
-    questionsApi.get(Number(id))
+    questionsApi.get(qid)
       .then(({ data }) => { setQuestion(data.data || data); })
       .catch(() => {})
       .finally(() => setLoading(false));
+    fetchNotes();
   }, [id]);
 
-  if (loading) return <div style={{ textAlign: 'center', padding: 60 }}><Spin size="large" /></div>;
+  const fetchNotes = () => {
+    if (!qid) return;
+    notesApi.list(qid).then(({ data }) => setNotes(data.data || data)).catch(() => {});
+  };
+
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return;
+    setNoteSaving(true);
+    try {
+      await notesApi.create(qid, newNote);
+      setNewNote('');
+      fetchNotes();
+      message.success('笔记已添加');
+    } catch { message.error('添加失败'); }
+    finally { setNoteSaving(false); }
+  };
+
+  const handleUpdateNote = async (noteId: number) => {
+    if (!editingContent.trim()) return;
+    setNoteSaving(true);
+    try {
+      await notesApi.update(noteId, editingContent);
+      setEditingNoteId(null);
+      setEditingContent('');
+      fetchNotes();
+      message.success('笔记已更新');
+    } catch { message.error('更新失败'); }
+    finally { setNoteSaving(false); }
+  };
+
+  const handleDeleteNote = async (noteId: number) => {
+    const prev = notes;
+    setNotes((ns) => ns.filter((n) => n.id !== noteId));
+    try {
+      await notesApi.delete(noteId);
+    } catch {
+      setNotes(prev);
+      message.error('删除失败');
+    }
+  };
+
+  if (loading) return (
+    <div style={{ maxWidth: 860 }}>
+      <Skeleton.Input active size="small" style={{ marginBottom: 12, width: 100, borderRadius: 8 }} />
+      <Skeleton.Input active block style={{ height: 180, marginBottom: 16, borderRadius: 14 }} />
+      <Skeleton.Input active block style={{ height: 160, marginBottom: 16, borderRadius: 14 }} />
+      <Skeleton.Input active block style={{ height: 140, marginBottom: 16, borderRadius: 14 }} />
+      <Skeleton.Input active block style={{ height: 120, borderRadius: 14 }} />
+    </div>
+  );
   if (!question) return <Empty description="题目不存在" />;
 
   const renderAnswer = () => {
@@ -73,12 +132,12 @@ export default function QuestionDetailPage() {
         return <div>{ans.blanks.map((b: string, i: number) => <Tag key={i} color="blue" style={{ marginRight: 8 }}>{b || `空 ${i + 1}`}</Tag>)}</div>;
       }
       if (ans.reference) {
-        return <TiptapViewer content={ans.reference} />;
+        return <MarkdownViewer content={ans.reference} />;
       }
     } catch {
-      return <Text>{question.answer}</Text>;
+      return <MarkdownViewer content={question.answer} />;
     }
-    return <Text>{question.answer}</Text>;
+    return <MarkdownViewer content={question.answer} />;
   };
 
   return (
@@ -90,20 +149,17 @@ export default function QuestionDetailPage() {
       <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <Space size={8} style={{ marginBottom: 8 }}>
+            <Space size={8} style={{ marginBottom: 16 }}>
               <div style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: question.subject_color }} />
               <Text className="text-secondary">{question.subject_name}</Text>
               <Text className="text-tertiary">·</Text>
               <Text className="text-secondary">{question.type_name}</Text>
             </Space>
-            <Title level={4} style={{ fontWeight: 600, marginTop: 4, marginBottom: 16, letterSpacing: '-0.02em' }}>
-              {question.content?.replace(/<[^>]+>/g, '').slice(0, 100)}
-            </Title>
           </div>
           <Button icon={<EditOutlined />} onClick={() => navigate(`/questions/add?edit=${question.id}`)}>编辑</Button>
         </div>
 
-        <TiptapViewer content={question.content} />
+        <MarkdownViewer content={question.content} />
       </Card>
 
       <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
@@ -125,7 +181,7 @@ export default function QuestionDetailPage() {
               <div style={{ background: 'rgba(0,122,255,0.04)', padding: 16, borderRadius: 10 }}>
                 <Text strong style={{ color: '#007AFF' }}>解析</Text>
                 <div style={{ marginTop: 8 }}>
-                  <TiptapViewer content={question.explanation} />
+                  <MarkdownViewer content={question.explanation} />
                 </div>
               </div>
             )}
@@ -135,6 +191,61 @@ export default function QuestionDetailPage() {
           <Text className="text-tertiary" style={{ display: 'block', textAlign: 'center', padding: 24 }}>
             点击"显示答案"查看正确答案和解析
           </Text>
+        )}
+      </Card>
+
+      {/* Notes */}
+      <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+        <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 16 }}>个人笔记</Text>
+
+        <div style={{ marginBottom: 16, padding: 12, background: 'rgba(242,242,247,0.4)', borderRadius: 10 }}>
+          <MarkdownEditor value={newNote} onChange={setNewNote} placeholder="写一条笔记..." />
+          <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddNote}
+            loading={noteSaving} disabled={!newNote.trim()}
+            style={{ marginTop: 8, borderRadius: 8 }}>
+            添加笔记
+          </Button>
+        </div>
+
+        {notes.length === 0 ? (
+          <Text className="text-tertiary" style={{ fontSize: 13 }}>暂无笔记</Text>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {notes.map((n) => (
+              <div key={n.id} style={{ padding: 14, background: 'rgba(242,242,247,0.3)', borderRadius: 10 }}>
+                {editingNoteId === n.id ? (
+                  <div>
+                    <MarkdownEditor value={editingContent} onChange={setEditingContent} placeholder="编辑笔记..." />
+                    <Space style={{ marginTop: 8 }}>
+                      <Button size="small" type="primary" loading={noteSaving}
+                        onClick={() => handleUpdateNote(n.id)}
+                        style={{ borderRadius: 8 }}>保存</Button>
+                      <Button size="small" onClick={() => { setEditingNoteId(null); setEditingContent(''); }}
+                        style={{ borderRadius: 8 }}>取消</Button>
+                    </Space>
+                  </div>
+                ) : (
+                  <div>
+                    <MarkdownViewer content={n.content} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                      <Text className="text-tertiary" style={{ fontSize: 11 }}>
+                        {dayjs(n.updated_at).format('MM-DD HH:mm')}
+                      </Text>
+                      <Space size={4}>
+                        <Button type="text" size="small" icon={<EditOutlined />}
+                          onClick={() => { setEditingNoteId(n.id); setEditingContent(n.content); }}
+                          style={{ color: '#007AFF', fontSize: 12 }}>编辑</Button>
+                        <Popconfirm title="删除这条笔记？" onConfirm={() => handleDeleteNote(n.id)}>
+                          <Button type="text" size="small" danger icon={<DeleteOutlined />}
+                            style={{ fontSize: 12 }}>删除</Button>
+                        </Popconfirm>
+                      </Space>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </Card>
 

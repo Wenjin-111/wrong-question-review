@@ -27,4 +27,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    pass
+    op.drop_constraint('ai_chat_message_ibfk_2', 'ai_chat_message', type_='foreignkey')
+    op.drop_constraint('chat_session_ibfk_2', 'chat_session', type_='foreignkey')
+    op.alter_column('ai_chat_message', 'question_id', existing_type=sa.Integer(), nullable=False)
+    op.alter_column('chat_session', 'question_id', existing_type=sa.Integer(), nullable=False)
+    op.create_foreign_key('ai_chat_message_ibfk_2', 'ai_chat_message', 'question', ['question_id'], ['id'], ondelete='CASCADE')
+    op.create_foreign_key('chat_session_ibfk_2', 'chat_session', 'question', ['question_id'], ['id'], ondelete='CASCADE')

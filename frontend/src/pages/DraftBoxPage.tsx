@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, Typography, Button, Popconfirm, message, Empty, Space } from 'antd';
 import { DeleteOutlined, EditOutlined, FolderOpenOutlined } from '@ant-design/icons';
 import { draftApi } from '../api/draft';
+import { renderMarkdown } from '../utils/markdown';
 
 const { Title, Text } = Typography;
 
@@ -19,11 +20,14 @@ export default function DraftBoxPage() {
   useEffect(() => { fetchDrafts(); }, []);
 
   const handleDelete = async (id: number) => {
+    const prev = drafts;
+    setDrafts((ds) => ds.filter((d) => d.id !== id));
     try {
       await draftApi.delete(id);
-      message.success('已删除');
-      fetchDrafts();
-    } catch { message.error('删除失败'); }
+    } catch {
+      setDrafts(prev);
+      message.error('删除失败');
+    }
   };
 
   const handleEdit = async (draftId: number) => {
@@ -51,7 +55,7 @@ export default function DraftBoxPage() {
     <div style={{ maxWidth: 720 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={4} style={{ fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>草稿箱</Title>
-        <Text className="text-secondary">最多 5 份草稿</Text>
+        <Text className="text-secondary">最多 100 份草稿</Text>
       </div>
 
       {drafts.length === 0 ? (
@@ -63,9 +67,11 @@ export default function DraftBoxPage() {
           <Card key={d.id} className="card-elevated" style={{ borderRadius: 14, marginBottom: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, lineHeight: 1.5, display: 'block', marginBottom: 8 }}>
-                  {d.content?.replace(/<[^>]+>/g, '').slice(0, 120) || '(无题目内容)'}
-                </Text>
+                <div
+                  className="markdown-body"
+                  style={{ fontSize: 15, lineHeight: 1.5, marginBottom: 8 }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(d.content || '') }}
+                />
                 <Text className="text-tertiary" style={{ fontSize: 12 }}>
                   最后保存：{new Date(d.updated_at).toLocaleString()}
                 </Text>
