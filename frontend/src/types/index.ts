@@ -16,6 +16,7 @@ export interface Subject {
   name: string;
   color: string;
   sort_order: number;
+  question_count?: number;
   question_types?: QuestionType[];
 }
 

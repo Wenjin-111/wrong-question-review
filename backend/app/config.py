@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
     UPLOAD_ROOT: str = "uploads"
     CORS_ORIGINS: str = "http://localhost:5173"
+    HUNYUAN_MODEL_DIR: str = "D:/AI_code/hunyuanOCR/HunyuanOCR"
     DEBUG: bool = False
 
     model_config = {"env_file": ".env", "extra": "ignore"}

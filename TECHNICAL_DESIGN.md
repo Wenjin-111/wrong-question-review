@@ -15,21 +15,27 @@
 │   │   │   ├── review.ts              # 重做（session/resume/submit/finish）
 │   │   │   ├── stats.ts               # 统计（dashboard/trends/streak）
 │   │   │   ├── chat.ts                # AI 对话（会话 CRUD/消息/绑定）
-│   │   │   ├── aiChat.ts              # 题目级 AI 答疑（历史/发送）
 │   │   │   ├── notes.ts               # 题目笔记
 │   │   │   ├── draft.ts               # 草稿
 │   │   │   ├── export.ts              # 导出
 │   │   │   ├── ocr.ts                 # OCR 识别
-│   │   │   └── settings.ts            # 用户设置（含 FSRS 保留率）
+│   │   │   ├── upload.ts              # 图片上传
+│   │   │   └── settings.ts            # 用户设置（含 FSRS 保留率、算24开关）
 │   │   ├── components/
 │   │   │   ├── common/
-│   │   │   │   └── AiChatPanel.tsx     # 可复用 AI 对话面板（SSE 流式）
+│   │   │   │   ├── ImageCropper.tsx    # 图片裁剪
+│   │   │   │   └── MarkdownViewer.tsx  # Markdown 只读渲染
 │   │   │   ├── layout/
-│   │   │   │   ├── AppLayout.tsx       # 整体布局（顶栏 + 侧栏）
+│   │   │   │   ├── AppLayout.tsx       # 整体布局（顶栏 + 侧栏 + 算24悬浮按钮）
 │   │   │   │   └── ProtectedRoute.tsx  # 登录守卫
-│   │   │   └── richEditor/
-│   │   │       ├── TiptapEditor.tsx    # TipTap 富文本编辑器
-│   │   │       └── TiptapViewer.tsx    # TipTap 只读渲染
+│   │   │   ├── richEditor/
+│   │   │   │   └── MarkdownEditor.tsx  # Markdown 编辑器（KaTeX + 图片上传）
+│   │   │   └── game24/
+│   │   │       ├── Game24Provider.tsx      # 开关状态 Context（后端 UserConfig）
+│   │   │       ├── Game24FloatingButton.tsx# 可拖拽悬浮图标（位置 localStorage 记忆）
+│   │   │       └── Game24Modal.tsx         # 游戏窗口（练习/挑战双模式）
+│   │   ├── game24/
+│   │   │   └── engine.ts              # 算24引擎（token 表达式/有理数求值/穷举求解/难度判定/出题）
 │   │   ├── pages/
 │   │   │   ├── LoginPage.tsx
 │   │   │   ├── RegisterPage.tsx
@@ -37,6 +43,7 @@
 │   │   │   ├── QuestionsPage.tsx       # 错题库列表
 │   │   │   ├── QuestionAddPage.tsx     # 添加错题
 │   │   │   ├── QuestionDetailPage.tsx  # 错题详情 + 笔记
+│   │   │   ├── BatchEditPage.tsx       # 批量编辑（勾选题目批量修改）
 │   │   │   ├── OCREntryPage.tsx        # OCR 录入
 │   │   │   ├── PDFImportPage.tsx       # PDF 导入
 │   │   │   ├── DraftBoxPage.tsx        # 草稿箱
@@ -53,7 +60,7 @@
 │   │   ├── types/
 │   │   │   └── index.ts               # TypeScript 类型定义
 │   │   ├── utils/
-│   │   │   ├── markdown.ts            # Markdown 渲染（DOMPurify + KaTeX）
+│   │   │   ├── markdown.ts            # Markdown 渲染（markdown-it + DOMPurify + KaTeX）
 │   │   │   ├── sse.ts                 # SSE 流式处理公用方法
 │   │   │   └── errorReporter.ts       # 前端错误上报
 │   │   ├── config.ts                  # API 地址配置
@@ -68,8 +75,8 @@
 │   │   ├── main.py                    # 入口（CORS、限流、路由注册、静态文件、健康检查）
 │   │   ├── config.py                  # pydantic-settings（含 Fernet key 校验）
 │   │   ├── database.py                # SQLAlchemy 引擎 + Session
-│   │   ├── dependencies.py            # get_current_user（JWT + token_version）
-│   │   ├── models/                    # 17 个 ORM 模型
+│   │   ├── dependencies.py            # get_current_user（JWT + token_version + token_family）
+│   │   ├── models/                    # 16 个 ORM 模型
 │   │   │   ├── __init__.py
 │   │   │   ├── user.py
 │   │   │   ├── subject.py
@@ -114,7 +121,8 @@
 │   │   │   ├── review_service.py
 │   │   │   ├── ocr_service.py
 │   │   │   ├── ai_service.py
-│   │   │   └── fsrs.py                # FSRS 算法（稳定性/难度/间隔计算）
+│   │   │   ├── fsrs.py                # FSRS 算法（稳定性/难度/间隔计算）
+│   │   │   └── hunyuan_ocr.py         # HunyuanOCR 本地模型推理（懒加载单例，需 GPU）
 │   │   ├── utils/
 │   │   │   ├── security.py            # JWT/bcrypt/Fernet
 │   │   │   └── shared.py             # 公用函数（strip_html, get_user_config）
@@ -122,7 +130,8 @@
 │   ├── uploads/                       # 文件存储
 │   ├── logs/                          # 日志文件
 │   ├── alembic.ini
-│   └── requirements.txt
+│   ├── requirements.txt                # 核心依赖
+│   └── requirements-ocr.txt            # OCR 依赖（PaddleOCR/PyMuPDF/torch+CUDA）
 │
 ├── REQUIREMENTS.md                    # 需求文档
 ├── TECHNICAL_DESIGN.md                # 本文件
@@ -137,7 +146,7 @@
 
 | 表 | 说明 | 关键字段 |
 |---|------|---------|
-| `user` | 用户 | username, email, password_hash, token_version, avatar_url |
+| `user` | 用户 | username, email, password_hash, token_version, token_family, avatar_url |
 | `subject` | 学科 | user_id, name, color |
 | `question_type` | 题型 | subject_id, user_id, name |
 | `tag` | 标签 | user_id, name, color |
@@ -182,6 +191,7 @@
 | `ai_api_url` | `https://api.openai.com/v1` |
 | `ai_api_key` | Fernet 加密存储 |
 | `ai_model` | `gpt-4o` |
+| `game24_enabled` | `true` / `false` |
 
 ---
 
@@ -201,6 +211,7 @@
 | POST | `/register` | 注册（自动创建默认学科题型） |
 | POST | `/login` | 登录，返回 access+refresh token |
 | POST | `/refresh` | 刷新 token（token_version 递增，旧 token 失效） |
+| POST | `/logout` | 登出（更换 token_family，吊销全部已签发 token） |
 | GET | `/me` | 当前用户信息 |
 
 ### 3.3 学科/题型/标签 (`/api`)
@@ -230,21 +241,25 @@
 | DELETE | `/questions/{id}` | 软删除 |
 | POST | `/batch-delete` | 批量删除 |
 | PUT | `/batch-tag` | 批量改标签 |
-| POST | `/upload-image` | 上传配图 |
+| POST | `/upload/image` | 上传配图 |
 
 ### 3.5 OCR/AI 解析 (`/api`)
 
+双引擎：`engine` 参数 `hunyuan`（默认，本地模型推理，需 GPU）或 `paddle`（本地 PaddleOCR，CPU）。
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/ocr/recognize` | OCR 识别（支持裁剪+旋转） |
-| POST | `/ocr/parse` | AI 结构化解析 |
+| POST | `/ocr/recognize` | OCR 识别（支持裁剪+旋转，按图片 file_id） |
+| POST | `/ocr/parse` | AI 结构化解析（单题） |
+| POST | `/ocr/parse-batch` | AI 多题拆分解析（返回题目数组） |
+| POST | `/pdf/ocr` | PDF 全流程：渲染（≤30 页）→ 逐页 OCR → AI 多题拆分 |
 | POST | `/pdf/extract` | PDF 文本提取 |
 
 ### 3.6 草稿 (`/api/drafts`)
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `` | 草稿列表（最多 5 份） |
+| GET | `` | 草稿列表（最多 100 份，超出自动删最旧） |
 | GET | `/{id}` | 草稿详情 |
 | POST | `` | 保存草稿 |
 | DELETE | `/{id}` | 删除草稿 |
@@ -317,6 +332,8 @@
 | PUT | `/fsrs-retention` | 更新保留率（clamp 0.70-0.99） |
 | GET | `/ai-config` | 获取 AI 配置（Key 脱敏） |
 | PUT | `/ai-config` | 更新 AI 配置 |
+| GET | `/game24-enabled` | 获取算24游戏开关（默认 false） |
+| PUT | `/game24-enabled` | 更新算24游戏开关 |
 | PUT | `/user-info` | 修改用户信息 |
 | PUT | `/password` | 修改密码 |
 | POST | `/avatar` | 上传头像 |
@@ -389,7 +406,7 @@ interval = S' * ln(retention) / ln(0.9)
 ```ts
 // utils/sse.ts
 export async function streamSSE(url, body, { onToken, onDone, onError })
-// 用于 AI 答疑流式响应，AiChatPanel 和 AIChatPage 共用
+// 用于 AI 答疑流式响应，AIChatPage 使用
 ```
 
 ### 5.3 Markdown 渲染（DOMPurify + KaTeX）
@@ -397,8 +414,9 @@ export async function streamSSE(url, body, { onToken, onDone, onError })
 ```ts
 // utils/markdown.ts
 export function renderMarkdown(text: string): string
-// HTML 转义 → 行级解析(headers/lists/paragraphs) → 
-// LaTeX 渲染(KaTeX) → DOMPurify 净化 → 输出安全 HTML
+// 1. 保护 ```代码块 → 2. $$..$$ 块级公式 → 3. $..$ 行内公式 → 3.5 裸 LaTeX 命令（如 \frac{}{}）
+// 4. markdown-it 渲染 → 5. 还原占位符 → DOMPurify 净化（白名单含 KaTeX 数学标签）→ 输出安全 HTML
+// 占位符用 Unicode 私用区字符（PUA），不受 markdown/HTML 解析干扰
 ```
 
 ### 5.4 骨架屏 & 乐观更新
@@ -422,6 +440,26 @@ export function renderMarkdown(text: string): string
 - `history` Map 缓存每题作答状态（答案/判分/解析）
 - "上一题"还原缓存的只读结果，"下一题"恢复或新建
 - 已答题不可重新作答
+
+### 5.7 算24小游戏
+
+纯前端实现（无后端求解），分三层：
+
+**`game24/engine.ts`（纯逻辑，无 React）**
+- `Token` 联合类型：数字/运算符/括号，表达式以 **token 数组**而非字符串拼接，杜绝两位数（11/13）歧义
+- `Fraction` 有理数类（num/den + gcd 约分），求值全程零浮点误差，`8÷(3−8÷3)` 精确得 24
+- `parseAndEval(tokens)`：递归下降求值器（×÷ 优先于 +−，括号，语法错误抛异常），不用 eval
+- `solve(nums)`：穷举 4 数唯一排列 × 4³ 运算符 × 5 种括号形态 = 7680 次，排除除数为 0；返回首个解 + 是否存在全程整数中间结果的解
+- `classify(nums)`：难度判定——仅分数解 → hard；有整数解且 max≤9 → easy；max≤10 → medium；其余无解
+- `generate(difficulty)`：随机采样 + 求解器过滤，重试上限 500 次，失败回退手工验证过的种子题池
+- `validateExpression(tokens, nums)`：校验"数字多重集合恰好等于题目 4 个数 + 语法合法 + 结果 = 24"
+
+**组件层（`components/game24/`）**
+- `Game24Provider`：Context 提供开关状态，挂载时 GET `/api/settings/game24-enabled`，切换时乐观更新 + PUT，失败回滚
+- `Game24FloatingButton`：fixed 定位左下角，pointer 事件拖拽 + `setPointerCapture` + `touch-action:none`，位移 <5px 判点击，位置 clamp 视口并持久化 localStorage（`game24_fab_pos`）
+- `Game24Modal`：`closable={false}`（关闭按钮内置于自定义头部，避免遮挡模式切换）；模式 Segmented（练习/挑战）；练习：难度切换/看答案/换题；挑战：状态机 `idle→running→finished`，deadline 用 `Date.now()` 差值倒计时（interval 250ms），答对 +10 分即时换题，答错连击清零红反馈 1.2s 后自动换题（防刷分，挑战中禁用看答案/换题）；Modal `destroyOnHidden` 关闭即重置
+
+**开关后端**：`GET/PUT /api/settings/game24-enabled`，复用 `_get_or_create_config`，config_key `game24_enabled`，值 `"true"/"false"`，无新表
 
 ---
 
@@ -451,6 +489,8 @@ DATABASE_URL=mysql+pymysql://user:pass@localhost:3306/wrong_questions
 JWT_SECRET=<random-string>
 ENCRYPTION_KEY=<fernet-key>    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 UPLOAD_ROOT=uploads
+CORS_ORIGINS=http://localhost:5173   # 逗号分隔的允许来源列表
+HUNYUAN_MODEL_DIR=D:/AI_code/hunyuanOCR/HunyuanOCR   # HunyuanOCR 本地模型目录（默认引擎需要）
 DEBUG=false
 
 # 前端通过 VITE_API_BASE_URL 配置 API 地址（默认 /api）

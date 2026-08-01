@@ -98,6 +98,12 @@ def create_question(req: QuestionCreate, db: Session = Depends(get_db), current_
     return _build_question_out(q, db)
 
 
+@router.put("/questions/batch-tag", status_code=status.HTTP_200_OK)
+def batch_tag(req: BatchTagRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    question_service.batch_update_tags(db, current_user.id, req.ids, req.tag_ids)
+    return {"ok": True}
+
+
 @router.put("/questions/{question_id}", response_model=QuestionOut)
 def update_question(question_id: int, req: QuestionUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     q = question_service.get_question_with_tags(db, question_id, current_user.id)
@@ -121,17 +127,14 @@ def batch_delete(req: BatchDeleteRequest, db: Session = Depends(get_db), current
     return {"deleted": count}
 
 
-@router.put("/questions/batch-tag", status_code=status.HTTP_200_OK)
-def batch_tag(req: BatchTagRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    question_service.batch_update_tags(db, current_user.id, req.ids, req.tag_ids)
-    return {"ok": True}
-
-
 @router.post("/upload/image")
 def upload_image(file: UploadFile = File(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     ext = file.filename.split(".")[-1].lower() if file.filename else "png"
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"不支持的文件类型: {ext}")
+    # 读前先按 Content-Length 拦截超限文件（防超大文件整体读入内存）
+    if file.size is not None and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="图片大小不能超过 10MB")
     contents = file.file.read()
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="图片大小不能超过 10MB")

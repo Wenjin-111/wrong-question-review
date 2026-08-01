@@ -12,7 +12,7 @@ export interface CreateSessionParams {
 }
 
 export const reviewApi = {
-  listSessions: () => client.get('/review/sessions'),
+  listSessions: (params?: { page?: number; page_size?: number }) => client.get('/review/sessions', { params }),
   createSession: (data: CreateSessionParams) => client.post('/review/sessions', data),
   getSession: (id: number) => client.get(`/review/sessions/${id}`),
   resumeSession: (id: number) => client.get(`/review/sessions/${id}/resume`),

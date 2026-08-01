@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, Typography, Button, Progress, Space, Input, Radio, Checkbox, Tag, message, Drawer, Spin, Statistic } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled, StopOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { reviewApi } from '../api/review';
 import { questionsApi } from '../api/questions';
 import { notesApi } from '../api/notes';
+import { useTheme } from '../store/ThemeProvider';
+import { getCssVar } from '../utils/themeVars';
 import MarkdownViewer from '../components/common/MarkdownViewer';
 
 const { Title, Text } = Typography;
@@ -19,6 +21,7 @@ interface QuestionItem {
 }
 
 export default function ReviewSessionPage() {
+  useTheme(); // 订阅主题变化（Progress strokeColor 需重渲染刷新）
   const navigate = useNavigate();
   const location = useLocation();
   const session = (location.state as any)?.session;
@@ -56,6 +59,22 @@ export default function ReviewSessionPage() {
     correct_attempts: number;
     accuracy: number;
   } | null>(null);
+
+  // 每题生成一次选项随机顺序（防位置记忆）；显示字母 j 对应原始索引 optionOrder[j]
+  const optionOrder = useMemo(() => {
+    const cur = questions[currentIdx];
+    let n = 0;
+    try {
+      const ans = JSON.parse(cur?.answer || '');
+      if (Array.isArray(ans.options)) n = ans.options.length;
+    } catch {}
+    const order = Array.from({ length: n }, (_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    return order;
+  }, [questions, currentIdx]);
 
   const openQuestionDetail = async () => {
     setDrawerVisible(true);
@@ -100,7 +119,7 @@ export default function ReviewSessionPage() {
       if (ans.options) {
         const hasOptionText = ans.options.some((o: string) => o?.trim());
         if (!hasOptionText && ans.correct?.length > 0) {
-          return <Text style={{ color: '#34C759', fontSize: 15, fontWeight: 500 }}>正确答案：{ans.correct.join('、')}</Text>;
+          return <Text style={{ color: 'var(--red-pen)', fontSize: 15, fontWeight: 500 }}>正确答案：{ans.correct.join('、')}</Text>;
         }
         return (
           <div>
@@ -110,8 +129,8 @@ export default function ReviewSessionPage() {
               return (
                 <div key={i} style={{
                   padding: '6px 10px', marginBottom: 4, borderRadius: 8,
-                  background: isCorrect ? 'rgba(52,199,89,0.08)' : 'transparent',
-                  color: isCorrect ? '#34C759' : '#1D1D1F',
+                  background: isCorrect ? 'var(--success-green-08)' : 'transparent',
+                  color: isCorrect ? 'var(--success-green)' : 'var(--ink)',
                   fontWeight: isCorrect ? 500 : 400,
                 }}>
                   {letter}. {o || letter} {isCorrect && ' ✓'}
@@ -125,7 +144,7 @@ export default function ReviewSessionPage() {
         return (
           <Space wrap>
             {ans.blanks.map((b: string, i: number) => (
-              <Tag key={i} color="green">{b}</Tag>
+              <Tag key={i} color="red">{b}</Tag>
             ))}
           </Space>
         );
@@ -139,32 +158,47 @@ export default function ReviewSessionPage() {
     }
   };
 
-  const renderUserAnswerText = () => {
+  const renderUserAnswerText = (order: number[] = []) => {
     if (!userAnswer) return '(未作答)';
     try {
       const ans = JSON.parse(typeof userAnswer === 'string' ? userAnswer : JSON.stringify(userAnswer));
-      if (ans.selected?.length) return ans.selected.join(', ');
+      if (ans.selected?.length) {
+        // 存储为原始字母，按当前随机顺序反推为显示字母，与作答区保持一致
+        return ans.selected
+          .map((c: string) => {
+            const idx = c.charCodeAt(0) - 65;
+            const pos = order.indexOf(idx);
+            return pos >= 0 ? String.fromCharCode(65 + pos) : c;
+          })
+          .join(', ');
+      }
       if (ans.blanks?.length) return ans.blanks.join(' 、 ');
       if (ans.reference) return ans.reference;
       return JSON.stringify(ans);
     } catch { return String(userAnswer); }
   };
 
-  const renderCorrectAnswerText = () => {
+  const renderCorrectAnswerText = (order: number[] = []) => {
     try {
       const ans = JSON.parse(correctAnswer);
       if (ans.options) {
         const hasOptionText = ans.options.some((o: string) => o?.trim());
         if (!hasOptionText && ans.correct?.length > 0) {
-          return <Text style={{ color: '#34C759' }}>正确答案：{ans.correct.join('、')}</Text>;
+          return <Text style={{ color: 'var(--red-pen)' }}>正确答案：{ans.correct.join('、')}</Text>;
         }
-        return ans.options.map((o: string, i: number) => (
-          <div key={i} style={{ color: ans.correct?.includes(String.fromCharCode(65 + i)) ? '#34C759' : '#1D1D1F', fontWeight: ans.correct?.includes(String.fromCharCode(65 + i)) ? 600 : 400 }}>
-            {String.fromCharCode(65 + i)}. {o} {ans.correct?.includes(String.fromCharCode(65 + i)) && '✓'}
-          </div>
-        ));
+        return ans.options.map((_: string, j: number) => {
+          // 按当前随机顺序展示，与作答区字母对应；打勾判断用原始字母
+          const originalIdx = order[j] ?? j;
+          const origLetter = String.fromCharCode(65 + originalIdx);
+          const isCorrect = ans.correct?.includes(origLetter);
+          return (
+            <div key={j} style={{ color: isCorrect ? 'var(--success-green)' : 'var(--ink)', fontWeight: isCorrect ? 600 : 400 }}>
+              {String.fromCharCode(65 + j)}. {ans.options[originalIdx]} {isCorrect && '✓'}
+            </div>
+          );
+        });
       }
-      if (ans.blanks) return <Space wrap>{ans.blanks.map((b: string, i: number) => <Tag key={i} color="green">{b}</Tag>)}</Space>;
+      if (ans.blanks) return <Space wrap>{ans.blanks.map((b: string, i: number) => <Tag key={i} color="red">{b}</Tag>)}</Space>;
       if (ans.reference) return <MarkdownViewer content={ans.reference} />;
       return <Text>{correctAnswer}</Text>;
     } catch { return <Text>{correctAnswer}</Text>; }
@@ -188,17 +222,27 @@ export default function ReviewSessionPage() {
       return isMulti ? (
         <Checkbox.Group value={selected} onChange={(vals) => setUserAnswer(JSON.stringify({ selected: vals }))}>
           <Space direction="vertical">
-            {options.map((opt: string, i: number) => (
-              <Checkbox key={i} value={String.fromCharCode(65 + i)} style={{ fontSize: 15, padding: '4px 0' }}>{opt || String.fromCharCode(65 + i)}</Checkbox>
-            ))}
+            {options.map((_: string, j: number) => {
+              const originalIdx = optionOrder[j] ?? j;
+              return (
+                <Checkbox key={j} value={String.fromCharCode(65 + j)} style={{ fontSize: 15, padding: '4px 0' }}>
+                  {String.fromCharCode(65 + j)}. {options[originalIdx] || String.fromCharCode(65 + originalIdx)}
+                </Checkbox>
+              );
+            })}
           </Space>
         </Checkbox.Group>
       ) : (
         <Radio.Group onChange={(e) => setUserAnswer(JSON.stringify({ selected: [e.target.value] }))} value={selected[0]}>
           <Space direction="vertical">
-            {options.map((opt: string, i: number) => (
-              <Radio key={i} value={String.fromCharCode(65 + i)} style={{ fontSize: 15, padding: '4px 0' }}>{opt || String.fromCharCode(65 + i)}</Radio>
-            ))}
+            {options.map((_: string, j: number) => {
+              const originalIdx = optionOrder[j] ?? j;
+              return (
+                <Radio key={j} value={String.fromCharCode(65 + j)} style={{ fontSize: 15, padding: '4px 0' }}>
+                  {String.fromCharCode(65 + j)}. {options[originalIdx] || String.fromCharCode(65 + originalIdx)}
+                </Radio>
+              );
+            })}
           </Space>
         </Radio.Group>
       );
@@ -241,13 +285,21 @@ export default function ReviewSessionPage() {
       // 选择题自动判断对错，跳过自评步骤
       if (answerData?.options) {
         const userAns = JSON.parse(userAnswerStr);
+        // 选项已随机打乱：显示字母 j 对应原始索引 optionOrder[j]，映射回原始字母再判分/存储
+        const mappedSelected = (userAns.selected || []).map((c: string) => {
+          const j = c.charCodeAt(0) - 65;
+          return String.fromCharCode(65 + (optionOrder[j] ?? j));
+        });
+        const storedUserAnswer = JSON.stringify({ ...userAns, selected: mappedSelected });
+        // 提交后 state 同步为映射后的原始字母，展示反推不再二次偏移
+        setUserAnswer(storedUserAnswer);
         const correctSet = new Set(correctAns.correct || []);
-        const selectedSet = new Set(userAns.selected || []);
+        const selectedSet = new Set(mappedSelected);
         const autoCorrect = correctSet.size === selectedSet.size && [...correctSet].every((c) => selectedSet.has(c));
 
         await reviewApi.submitAnswer(session.session_id, {
           question_id: question.id,
-          user_answer: userAnswerStr,
+          user_answer: storedUserAnswer,
           is_correct: autoCorrect,
           current_index: currentIdx + 1,
           rating: autoCorrect ? 3 : 1,
@@ -258,7 +310,7 @@ export default function ReviewSessionPage() {
         setHistory((h) => ({
           ...h,
           [currentIdx]: {
-            userAnswer: userAnswerStr,
+            userAnswer: storedUserAnswer,
             isCorrect: autoCorrect,
             correctAnswer: res.correct_answer,
             explanation: res.explanation,
@@ -356,12 +408,12 @@ export default function ReviewSessionPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Progress percent={Math.round(((currentIdx + (evaluated ? 1 : 0)) / questions.length) * 100)}
           format={() => `${currentIdx + (evaluated ? 1 : 0)} / ${questions.length}`}
-          strokeColor="#007AFF" trailColor="rgba(60,60,67,0.06)" style={{ flex: 1, marginBottom: 0 }} />
+          strokeColor={getCssVar('--blue-ink')} trailColor={getCssVar('--ink-alpha-06')} style={{ flex: 1, marginBottom: 0 }} />
         <Button size="small" danger icon={<StopOutlined />} onClick={handleAbandon}
           style={{ borderRadius: 8, flexShrink: 0 }}>放弃</Button>
       </div>
 
-      <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+      <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
         <Space size={8} style={{ marginBottom: 12 }}>
           <Tag color="blue">{question.subject.name}</Tag>
           <Tag>{question.question_type.name}</Tag>
@@ -371,7 +423,7 @@ export default function ReviewSessionPage() {
 
       {/* Answer input */}
       {!submitted && (
-        <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+        <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
           <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 12 }}>你的答案</Text>
           {renderAnswerInput()}
           <div style={{ marginTop: 20 }}>
@@ -383,19 +435,19 @@ export default function ReviewSessionPage() {
 
       {/* After submit: show both answers */}
       {submitted && !evaluated && (
-        <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+        <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
-            <div style={{ background: 'rgba(0,122,255,0.04)', padding: 16, borderRadius: 10 }}>
-              <Text strong style={{ color: '#007AFF', display: 'block', marginBottom: 8 }}>你的答案</Text>
-              <Text>{renderUserAnswerText()}</Text>
+            <div style={{ background: 'var(--blue-ink-04)', padding: 16, borderRadius: 10 }}>
+              <Text strong style={{ color: 'var(--blue-ink)', display: 'block', marginBottom: 8 }}>你的答案</Text>
+              <Text>{renderUserAnswerText(optionOrder)}</Text>
             </div>
-            <div style={{ background: 'rgba(52,199,89,0.04)', padding: 16, borderRadius: 10 }}>
-              <Text strong style={{ color: '#34C759', display: 'block', marginBottom: 8 }}>正确答案</Text>
-              <div>{renderCorrectAnswerText()}</div>
+            <div style={{ background: 'var(--red-pen-05)', padding: 16, borderRadius: 10 }}>
+              <Text strong style={{ color: 'var(--red-pen)', display: 'block', marginBottom: 8 }}>正确答案</Text>
+              <div>{renderCorrectAnswerText(optionOrder)}</div>
             </div>
           </div>
           {explanation && (
-            <div style={{ background: 'rgba(242,242,247,0.6)', padding: 16, borderRadius: 10, marginBottom: 20 }}>
+            <div style={{ background: 'var(--paper-deep-60)', padding: 16, borderRadius: 10, marginBottom: 20 }}>
               <Text strong style={{ display: 'block', marginBottom: 8 }}>解析</Text>
               <MarkdownViewer content={explanation} />
             </div>
@@ -408,13 +460,13 @@ export default function ReviewSessionPage() {
                 style={{ borderRadius: 10, minWidth: 100 }}>完全忘了</Button>
               <Button size="large" loading={submitting}
                 onClick={() => handleEvaluate(true, 2)}
-                style={{ borderRadius: 10, minWidth: 100, color: '#FF9500', borderColor: '#FF9500' }}>勉强想起</Button>
+                style={{ borderRadius: 10, minWidth: 100, color: 'var(--amber)', borderColor: 'var(--amber)' }}>勉强想起</Button>
               <Button size="large" loading={submitting}
                 onClick={() => handleEvaluate(true, 3)}
-                style={{ borderRadius: 10, minWidth: 100, color: '#007AFF', borderColor: '#007AFF' }}>顺利答对</Button>
+                style={{ borderRadius: 10, minWidth: 100, color: 'var(--blue-ink)', borderColor: 'var(--blue-ink)' }}>顺利答对</Button>
               <Button type="primary" size="large" loading={submitting}
                 onClick={() => handleEvaluate(true, 4)}
-                style={{ background: '#34C759', borderColor: '#34C759', borderRadius: 10, minWidth: 100 }}>太简单了</Button>
+                style={{ background: 'var(--red-pen)', borderColor: 'var(--red-pen)', borderRadius: 10, minWidth: 100 }}>太简单了</Button>
             </div>
           </div>
         </Card>
@@ -422,16 +474,16 @@ export default function ReviewSessionPage() {
 
       {/* After self-evaluation — result + answer comparison + actions */}
       {evaluated && (
-        <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16, textAlign: 'center' }}>
+        <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16, textAlign: 'center' }}>
           {isCorrect ? (
             <>
-              <CheckCircleFilled style={{ fontSize: 48, color: '#34C759', marginBottom: 8 }} />
-              <Title level={5} style={{ color: '#34C759', margin: 0 }}>回答正确！</Title>
+              <CheckCircleFilled style={{ fontSize: 48, color: 'var(--success-green)', marginBottom: 8 }} />
+              <Title level={5} style={{ color: 'var(--success-green)', margin: 0 }}>回答正确！</Title>
             </>
           ) : (
             <>
-              <CloseCircleFilled style={{ fontSize: 48, color: '#FF3B30', marginBottom: 8 }} />
-              <Title level={5} style={{ color: '#FF3B30', margin: 0 }}>回答错误</Title>
+              <CloseCircleFilled style={{ fontSize: 48, color: 'var(--red-pen-deep)', marginBottom: 8 }} />
+              <Title level={5} style={{ color: 'var(--red-pen-deep)', margin: 0 }}>回答错误</Title>
             </>
           )}
 
@@ -439,17 +491,17 @@ export default function ReviewSessionPage() {
           {correctAnswer && (
             <div style={{ textAlign: 'left', marginTop: 20 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
-                <div style={{ background: 'rgba(0,122,255,0.04)', padding: 16, borderRadius: 10 }}>
-                  <Text strong style={{ color: '#007AFF', display: 'block', marginBottom: 8 }}>你的答案</Text>
-                  <Text>{renderUserAnswerText()}</Text>
+                <div style={{ background: 'var(--blue-ink-04)', padding: 16, borderRadius: 10 }}>
+                  <Text strong style={{ color: 'var(--blue-ink)', display: 'block', marginBottom: 8 }}>你的答案</Text>
+                  <Text>{renderUserAnswerText(optionOrder)}</Text>
                 </div>
-                <div style={{ background: 'rgba(52,199,89,0.04)', padding: 16, borderRadius: 10 }}>
-                  <Text strong style={{ color: '#34C759', display: 'block', marginBottom: 8 }}>正确答案</Text>
-                  <div>{renderCorrectAnswerText()}</div>
+                <div style={{ background: 'var(--red-pen-05)', padding: 16, borderRadius: 10 }}>
+                  <Text strong style={{ color: 'var(--red-pen)', display: 'block', marginBottom: 8 }}>正确答案</Text>
+                  <div>{renderCorrectAnswerText(optionOrder)}</div>
                 </div>
               </div>
               {explanation && (
-                <div style={{ background: 'rgba(242,242,247,0.6)', padding: 16, borderRadius: 10, marginBottom: 16 }}>
+                <div style={{ background: 'var(--paper-deep-60)', padding: 16, borderRadius: 10, marginBottom: 16 }}>
                   <Text strong style={{ display: 'block', marginBottom: 8 }}>解析</Text>
                   <MarkdownViewer content={explanation} />
                 </div>
@@ -512,7 +564,7 @@ export default function ReviewSessionPage() {
             </div>
 
             <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 8 }}>题目内容</Text>
-            <div style={{ marginBottom: 20, padding: 16, background: 'rgba(242,242,247,0.6)', borderRadius: 10 }}>
+            <div style={{ marginBottom: 20, padding: 16, background: 'var(--paper-deep-60)', borderRadius: 10 }}>
               <MarkdownViewer content={drawerData.content} />
             </div>
 
@@ -523,14 +575,14 @@ export default function ReviewSessionPage() {
             )}
 
             <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 8 }}>答案</Text>
-            <div style={{ marginBottom: 20, padding: 16, background: 'rgba(52,199,89,0.06)', borderRadius: 10 }}>
+            <div style={{ marginBottom: 20, padding: 16, background: 'var(--red-pen-05)', borderRadius: 10 }}>
               {renderAnswerForDrawer(drawerData.answer)}
             </div>
 
             {drawerData.explanation && (
               <>
                 <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 8 }}>解析</Text>
-                <div style={{ marginBottom: 20, padding: 16, background: 'rgba(0,122,255,0.04)', borderRadius: 10 }}>
+                <div style={{ marginBottom: 20, padding: 16, background: 'var(--blue-ink-04)', borderRadius: 10 }}>
                   <MarkdownViewer content={drawerData.explanation} />
                 </div>
               </>
@@ -538,13 +590,13 @@ export default function ReviewSessionPage() {
 
             <div style={{
               display: 'flex', gap: 24, padding: 16,
-              background: 'rgba(242,242,247,0.4)', borderRadius: 10, marginBottom: 20,
+              background: 'var(--paper-deep-60)', borderRadius: 10, marginBottom: 20,
             }}>
               <Statistic title="练习次数" value={drawerData.total_attempts} />
               <Statistic title="正确次数" value={drawerData.correct_attempts}
-                valueStyle={{ color: '#34C759' }} />
+                valueStyle={{ color: 'var(--red-pen)' }} />
               <Statistic title="正确率" value={Math.round(drawerData.accuracy * 100) / 100}
-                suffix="%" valueStyle={{ color: drawerData.accuracy >= 60 ? '#34C759' : '#FF3B30' }} />
+                suffix="%" valueStyle={{ color: drawerData.accuracy >= 60 ? 'var(--red-pen)' : 'var(--red-pen-deep)' }} />
             </div>
 
             {drawerNotes.length > 0 && (
@@ -553,7 +605,7 @@ export default function ReviewSessionPage() {
                 {drawerNotes.map((n) => (
                   <div key={n.id} style={{
                     padding: 12, marginBottom: 8,
-                    background: 'rgba(242,242,247,0.3)', borderRadius: 10,
+                    background: 'var(--paper-deep-50)', borderRadius: 10,
                   }}>
                     <MarkdownViewer content={n.content} />
                     <Text className="text-tertiary" style={{ fontSize: 11, display: 'block', marginTop: 4 }}>

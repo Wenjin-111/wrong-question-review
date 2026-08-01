@@ -60,7 +60,7 @@ export default function DraftBoxPage() {
 
       {drafts.length === 0 ? (
         <Card className="card-elevated" style={{ borderRadius: 14 }}>
-          <Empty description="草稿箱为空。在添加错题或 OCR 录入时可保存草稿。" image={<FolderOpenOutlined style={{ fontSize: 48, color: '#AEAEB2' }} />} />
+          <Empty description="草稿箱为空。在添加错题或 OCR 录入时可保存草稿。" image={<FolderOpenOutlined style={{ fontSize: 48, color: 'var(--ink-tertiary)' }} />} />
         </Card>
       ) : (
         drafts.map((d: any) => (

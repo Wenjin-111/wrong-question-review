@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -189,7 +190,8 @@ async def send_message(session_id: int, req: SendMessageRequest, db: Session = D
                     if chunk is None:
                         continue
                     full += chunk
-                    yield f"data: {chunk}\n\n"
+                    # JSON 编码后发送：SSE data 行不允许裸换行，直接拼接会把内容换行吞掉
+                    yield f"data: {json.dumps(chunk)}\n\n"
 
                 if full:
                     # Use a fresh DB session to save the AI response

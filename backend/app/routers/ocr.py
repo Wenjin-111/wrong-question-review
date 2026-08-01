@@ -97,6 +97,9 @@ async def pdf_ocr(
     """PDF 导入 + OCR 识别 + AI 多题解析，全流程串联。"""
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="请上传 PDF 文件")
+    # 读前先按 Content-Length 拦截超限文件（防超大文件整体读入内存）
+    if file.size is not None and file.size > MAX_PDF_SIZE:
+        raise HTTPException(status_code=400, detail="PDF 大小不能超过 50MB")
     contents = await file.read()
     if len(contents) > MAX_PDF_SIZE:
         raise HTTPException(status_code=400, detail="PDF 大小不能超过 50MB")
@@ -174,6 +177,9 @@ async def pdf_ocr(
 async def extract_pdf_text(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="请上传 PDF 文件")
+    # 读前先按 Content-Length 拦截超限文件（防超大文件整体读入内存）
+    if file.size is not None and file.size > MAX_PDF_SIZE:
+        raise HTTPException(status_code=400, detail="PDF 大小不能超过 50MB")
     contents = await file.read()
     if len(contents) > MAX_PDF_SIZE:
         raise HTTPException(status_code=400, detail="PDF 大小不能超过 50MB")

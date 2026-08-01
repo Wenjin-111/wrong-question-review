@@ -1,15 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Tabs, Card, Button, Modal, Form, Input, InputNumber, Popconfirm, message, Empty, Space, Tag, Typography } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Tabs, Card, Button, Modal, Form, Input, InputNumber, Popconfirm, message, Empty, Space, Tag, Typography, Switch, Upload, Slider } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined, DownloadOutlined, PictureOutlined } from '@ant-design/icons';
 import { subjectsApi } from '../api/subjects';
 import { tagsApi } from '../api/tags';
 import { settingsApi } from '../api/settings';
 import { exportApi } from '../api/export';
+import { uploadApi } from '../api/upload';
+import { useGame24 } from '../components/game24/Game24Provider';
+import { useTheme } from '../store/ThemeProvider';
+import type { ThemeId } from '../styles/theme';
 import type { Subject, Tag as TagType } from '../types';
 
 const { Title, Text } = Typography;
 
-const COLORS = ['#007AFF', '#FF9500', '#34C759', '#FF3B30', '#AF52DE', '#FF2D55', '#5856D6', '#00C7BE'];
+// 学科数据色（存数据库并被 ECharts 使用，保持静态 hex）
+const COLORS = ['#3B5BA5', '#E8A33D', '#E34A3E', '#4C8A3D', '#6B5BA5', '#B3261E', '#C77D3C', '#2E8B8B'];
 
 function ColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
   return (
@@ -20,7 +25,7 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (c: string)
           onClick={() => onChange(c)}
           style={{
             width: 28, height: 28, borderRadius: 14, backgroundColor: c, cursor: 'pointer',
-            border: value === c ? '3px solid #1D1D1F' : '3px solid transparent',
+            border: value === c ? '3px solid var(--ink)' : '3px solid transparent',
             transition: 'border 0.15s',
           }}
         />
@@ -42,9 +47,167 @@ export default function SettingsPage() {
           { key: 'spaced', label: '遗忘曲线', children: <SpacedTab /> },
           { key: 'ai', label: 'AI 配置', children: <AiConfigTab /> },
           { key: 'data', label: '数据管理', children: <DataTab /> },
+          { key: 'game', label: '游戏', children: <GameTab /> },
+          { key: 'appearance', label: '外观', children: <AppearanceTab /> },
         ]}
       />
     </div>
+  );
+}
+
+function AppearanceTab() {
+  const { theme, bgImage, bgOverlay, setTheme, setBgImage, setBgOverlay } = useTheme();
+  const [uploading, setUploading] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
+
+  const fetchHistory = () => {
+    settingsApi.getBgHistory().then(({ data }) => {
+      setHistory((data as any).history ?? (data as any).data?.history ?? []);
+    }).catch(() => {});
+  };
+
+  useEffect(() => { fetchHistory(); }, []);
+
+  const handleRemoveHistory = async (url: string) => {
+    try {
+      await settingsApi.deleteBgHistory(url);
+      setHistory((hs) => hs.filter((h) => h !== url));
+    } catch { message.error('删除失败'); }
+  };
+
+  const themeOptions: { id: ThemeId; name: string; desc: string; swatch: string[] }[] = [
+    { id: 'paper', name: '纸本', desc: '米白纸色 · 错题本质感', swatch: ['#FAF6EF', '#FFFDF8', '#2C2B2A'] },
+    { id: 'light', name: '白色', desc: '纯白干净 · 简洁明快', swatch: ['#FFFFFF', '#F3F4F6', '#1A1A1A'] },
+    { id: 'dark', name: '黑色', desc: '深色护眼 · 专注模式', swatch: ['#121417', '#1C1F24', '#E6E8EB'] },
+  ];
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const { data } = await uploadApi.image(file);
+      const ok = await setBgImage(data.url);
+      if (ok) {
+        message.success('背景已更新');
+        fetchHistory();
+      } else {
+        message.error('保存失败');
+      }
+    } catch {
+      message.error('上传失败');
+    } finally {
+      setUploading(false);
+    }
+    return false;
+  };
+
+  return (
+    <Card className="card-elevated" style={{ borderRadius: 10 }}>
+      <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 12 }}>界面主题</Text>
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+        {themeOptions.map((t) => (
+          <div
+            key={t.id}
+            onClick={() => setTheme(t.id)}
+            style={{
+              width: 150, padding: 12, borderRadius: 10, cursor: 'pointer',
+              border: theme === t.id ? '2px solid var(--blue-ink)' : '1px solid var(--border-light)',
+              background: 'var(--paper-card)',
+              transition: 'all 0.15s',
+            }}
+          >
+            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+              {t.swatch.map((c, i) => (
+                <div key={i} style={{ flex: 1, height: 28, borderRadius: 6, background: c, border: '1px solid rgba(0,0,0,0.08)' }} />
+              ))}
+            </div>
+            <Text strong style={{ display: 'block' }}>{t.name}</Text>
+            <Text className="text-tertiary" style={{ fontSize: 12 }}>{t.desc}</Text>
+          </div>
+        ))}
+      </div>
+
+      <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 12 }}>自定义背景</Text>
+      <Space direction="vertical" size={12}>
+        {bgImage && (
+          <img src={bgImage} alt="背景预览"
+            style={{ maxWidth: 320, maxHeight: 120, borderRadius: 8, border: '1px solid var(--border-light)', objectFit: 'cover' }} />
+        )}
+        <Space>
+          <Upload showUploadList={false} accept="image/*" beforeUpload={handleUpload}>
+            <Button icon={<PictureOutlined />} loading={uploading}>{bgImage ? '更换背景' : '上传背景照片'}</Button>
+          </Upload>
+          {bgImage && <Button danger onClick={() => setBgImage('')}>移除背景</Button>}
+        </Space>
+        <Text className="text-tertiary" style={{ fontSize: 12 }}>
+          背景图将显示在所有页面背后，系统会自动加半透明遮罩保证文字可读；建议使用浅色图片。
+        </Text>
+
+        {history.length > 0 && (
+          <div>
+            <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 8 }}>历史背景</Text>
+            <Space wrap size={10}>
+              {history.map((url) => {
+                const active = bgImage === url;
+                return (
+                  <div key={url} style={{ position: 'relative' }}>
+                    <img
+                      src={url}
+                      alt="历史背景"
+                      onClick={() => setBgImage(url)}
+                      style={{
+                        width: 84, height: 52, objectFit: 'cover', borderRadius: 6, cursor: 'pointer',
+                        border: active ? '2px solid var(--blue-ink)' : '1px solid var(--border-light)',
+                        opacity: 1,
+                      }}
+                    />
+                    {active && (
+                      <span style={{
+                        position: 'absolute', left: 4, top: 3, fontSize: 10, lineHeight: '16px',
+                        padding: '0 5px', borderRadius: 4, background: 'var(--blue-ink)', color: '#fff',
+                      }}>
+                        使用中
+                      </span>
+                    )}
+                    <Popconfirm title="从历史中移除？" onConfirm={() => handleRemoveHistory(url)}>
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        style={{ position: 'absolute', right: -6, top: -6, background: 'var(--paper-card)', fontSize: 11 }}
+                      />
+                    </Popconfirm>
+                  </div>
+                );
+              })}
+            </Space>
+            <Text className="text-tertiary" style={{ fontSize: 12, display: 'block', marginTop: 6 }}>
+              点击缩略图可快捷切换背景，最多保留 10 张。
+            </Text>
+          </div>
+        )}
+
+        <div>
+          <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 4 }}>背景遮罩强度</Text>
+          <Space>
+            <Slider
+              min={0}
+              max={100}
+              value={Number.isFinite(bgOverlay) ? Math.round(bgOverlay * 100) : 68}
+              onChange={(v) => setBgOverlay(v / 100)}
+              disabled={!bgImage}
+              style={{ width: 220 }}
+            />
+            <Text className="text-secondary" style={{ fontSize: 13, width: 40 }}>
+              {Number.isFinite(bgOverlay) ? Math.round(bgOverlay * 100) : 68}%
+            </Text>
+          </Space>
+          <Text className="text-tertiary" style={{ fontSize: 12, display: 'block', marginTop: 2 }}>
+            {bgImage ? '越高背景越不透明（文字更清晰），越低照片越清晰。建议 50% - 80%。' : '请先上传背景照片，再调节遮罩强度。'}
+          </Text>
+        </div>
+      </Space>
+    </Card>
   );
 }
 
@@ -54,7 +217,7 @@ function SubjectsTab() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Subject | null>(null);
   const [form] = Form.useForm();
-  const [color, setColor] = useState('#007AFF');
+  const [color, setColor] = useState('var(--blue-ink)');
 
   const fetchSubjects = async () => {
     setLoading(true);
@@ -67,7 +230,7 @@ function SubjectsTab() {
 
   useEffect(() => { fetchSubjects(); }, []);
 
-  const openCreate = () => { setEditing(null); form.resetFields(); setColor('#007AFF'); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); form.resetFields(); setColor('var(--blue-ink)'); setModalOpen(true); };
   const openEdit = (s: Subject) => { setEditing(s); form.setFieldsValue(s); setColor(s.color); setModalOpen(true); };
 
   const handleSubmit = async () => {
@@ -103,7 +266,7 @@ function SubjectsTab() {
         <Empty description="还没有学科，点击上方按钮创建" />
       ) : (
         subjects.map((s) => (
-          <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(60,60,67,0.04)' }}>
+          <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--ink-alpha-04)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: s.color }} />
               <div>
@@ -137,18 +300,15 @@ function SubjectsTab() {
 
 function TypesTab() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>(0);
   const [form] = Form.useForm();
 
   const fetchSubjects = async () => {
-    setLoading(true);
     try {
       const { data } = await subjectsApi.list();
       setSubjects(data);
     } catch { message.error('加载失败'); }
-    finally { setLoading(false); }
   };
 
   useEffect(() => { fetchSubjects(); }, []);
@@ -217,7 +377,7 @@ function TagsTab() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<TagType | null>(null);
   const [form] = Form.useForm();
-  const [color, setColor] = useState('#007AFF');
+  const [color, setColor] = useState('var(--blue-ink)');
 
   const fetchTags = async () => {
     setLoading(true);
@@ -230,7 +390,7 @@ function TagsTab() {
 
   useEffect(() => { fetchTags(); }, []);
 
-  const openCreate = () => { setEditing(null); form.resetFields(); setColor('#007AFF'); setModalOpen(true); };
+  const openCreate = () => { setEditing(null); form.resetFields(); setColor('var(--blue-ink)'); setModalOpen(true); };
   const openEdit = (t: TagType) => { setEditing(t); form.setFieldsValue(t); setColor(t.color); setModalOpen(true); };
 
   const handleSubmit = async () => {
@@ -335,7 +495,7 @@ function SpacedTab() {
         </Text>
       </div>
 
-      <div style={{ padding: 16, background: 'rgba(242,242,247,0.5)', borderRadius: 12, marginBottom: 16 }}>
+      <div style={{ padding: 16, background: 'var(--paper-bg-50)', borderRadius: 12, marginBottom: 16 }}>
         <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>算法原理</Text>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[
@@ -345,14 +505,14 @@ function SpacedTab() {
             { label: '评分映射', desc: '完全忘了→1 · 勉强想起→2 · 顺利答对→3 · 太简单了→4。评分越高稳定性增长越快。' },
           ].map((item) => (
             <div key={item.label} style={{ display: 'flex', gap: 8 }}>
-              <Text strong style={{ fontSize: 13, minWidth: 140, color: '#007AFF' }}>{item.label}</Text>
-              <Text style={{ fontSize: 13, color: '#1D1D1F' }}>{item.desc}</Text>
+              <Text strong style={{ fontSize: 13, minWidth: 140, color: 'var(--blue-ink)' }}>{item.label}</Text>
+              <Text style={{ fontSize: 13, color: 'var(--ink)' }}>{item.desc}</Text>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ padding: 12, background: 'rgba(242,242,247,0.4)', borderRadius: 10 }}>
+      <div style={{ padding: 12, background: 'var(--paper-bg-40)', borderRadius: 10 }}>
         <Text className="text-tertiary" style={{ fontSize: 12 }}>
           常用参考：语言学习 90-95% · 考试备考 85-90% · 知识回顾 80-85%
         </Text>
@@ -395,6 +555,42 @@ function AiConfigTab() {
         </Form.Item>
         <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>保存配置</Button>
       </Form>
+    </Card>
+  );
+}
+
+function GameTab() {
+  const { enabled, setEnabled, loading } = useGame24();
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = async (checked: boolean) => {
+    setSaving(true);
+    const ok = await setEnabled(checked);
+    if (!ok) message.error('保存失败，请重试');
+    setSaving(false);
+  };
+
+  return (
+    <Card className="card-elevated" style={{ borderRadius: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <Text strong style={{ fontSize: 16, display: 'block' }}>算24小游戏</Text>
+          <Text className="text-secondary" style={{ fontSize: 13 }}>
+            开启后在页面左下角显示游戏入口悬浮按钮，可自由拖拽位置
+          </Text>
+        </div>
+        <Switch checked={enabled} loading={loading || saving} onChange={handleChange} />
+      </div>
+      <div style={{ padding: 16, background: 'var(--paper-bg-50)', borderRadius: 12 }}>
+        <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 12 }}>玩法说明</Text>
+        <Text style={{ fontSize: 13, color: 'var(--ink)', display: 'block' }}>
+          用加、减、乘、除和括号，将 4 个数字凑成 24。支持两种模式：
+        </Text>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          <Text style={{ fontSize: 13, color: 'var(--ink)' }}>· <b>练习</b>：不限时，可看答案、换题，按难度分级（简单 1-9 整数解 / 中等 1-10 常规解 / 困难 1-13 分数解）</Text>
+          <Text style={{ fontSize: 13, color: 'var(--ink)' }}>· <b>挑战</b>：60 秒限时计分，答对得 10 分</Text>
+        </div>
+      </div>
     </Card>
   );
 }

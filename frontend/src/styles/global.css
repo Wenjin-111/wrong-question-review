@@ -1,4 +1,189 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import 'lxgw-wenkai-webfont/style.css';
+
+/* ===== 主题变量：paper（纸本红笔，默认） ===== */
+:root {
+  --paper-bg: #FAF6EF;
+  --paper-card: #FFFDF8;
+  --paper-deep: #F3EDE0;
+  --ink: #2C2B2A;
+  --ink-secondary: #6B6863;
+  --ink-tertiary: #98958E;
+  --red-pen: #E34A3E;
+  --red-pen-deep: #B3261E;
+  --blue-ink: #3B5BA5;
+  --amber: #E8A33D;
+  --amber-deep: #9A6A00;
+  --success-green: #4C8A3D;
+  --success-green-08: rgba(76, 138, 61, 0.08);
+  --border: rgba(44, 43, 42, 0.12);
+  --border-light: rgba(44, 43, 42, 0.08);
+  --shadow-warm: 0 1px 2px rgba(90, 60, 20, 0.06), 0 1px 1px rgba(90, 60, 20, 0.04);
+  --shadow-warm-lg: 0 2px 8px rgba(90, 60, 20, 0.08), 0 1px 3px rgba(90, 60, 20, 0.06);
+  --shadow-card: 0 4px 24px rgba(90, 60, 20, 0.08), 0 1px 4px rgba(90, 60, 20, 0.04);
+  --bg-overlay-rgb: 250 246 239; /* 背景遮罩色（跟随主题） */
+  --bg-overlay-alpha: 0.68; /* 背景遮罩强度（用户可调，ThemeProvider 覆盖） */
+  --font-kai: 'LXGW WenKai', 'KaiTi', 'STKaiti', '楷体', serif;
+  --font-mono: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+
+  --paper-bg-40: rgba(250, 246, 239, 0.4);
+  --paper-bg-50: rgba(250, 246, 239, 0.5);
+  --paper-bg-80: rgba(250, 246, 239, 0.8);
+  --paper-bg-85: rgba(250, 246, 239, 0.85);
+  --paper-bg-90: rgba(250, 246, 239, 0.9);
+  --paper-deep-50: rgba(243, 237, 224, 0.5);
+  --paper-deep-60: rgba(243, 237, 224, 0.6);
+  --paper-deep-80: rgba(243, 237, 224, 0.8);
+  --ink-alpha-04: rgba(44, 43, 42, 0.04);
+  --ink-alpha-06: rgba(44, 43, 42, 0.06);
+  --ink-alpha-08: rgba(44, 43, 42, 0.08);
+  --ink-alpha-10: rgba(44, 43, 42, 0.1);
+  --ink-alpha-12: rgba(44, 43, 42, 0.12);
+  --ink-alpha-15: rgba(44, 43, 42, 0.15);
+  --ink-alpha-18: rgba(44, 43, 42, 0.18);
+  --ink-alpha-30: rgba(44, 43, 42, 0.3);
+  --blue-ink-02: rgba(59, 91, 165, 0.02);
+  --blue-ink-04: rgba(59, 91, 165, 0.04);
+  --blue-ink-05: rgba(59, 91, 165, 0.05);
+  --blue-ink-06: rgba(59, 91, 165, 0.06);
+  --blue-ink-08: rgba(59, 91, 165, 0.08);
+  --blue-ink-10: rgba(59, 91, 165, 0.1);
+  --blue-ink-25: rgba(59, 91, 165, 0.25);
+  --blue-ink-35: rgba(59, 91, 165, 0.35);
+  --red-pen-04: rgba(227, 74, 62, 0.04);
+  --red-pen-05: rgba(227, 74, 62, 0.05);
+  --red-pen-08: rgba(227, 74, 62, 0.08);
+  --red-pen-10: rgba(227, 74, 62, 0.1);
+  --red-pen-18: rgba(227, 74, 62, 0.18);
+  --red-pen-deep-12: rgba(179, 38, 30, 0.12);
+  --amber-06: rgba(232, 163, 61, 0.06);
+  --amber-07: rgba(232, 163, 61, 0.07);
+  --amber-12: rgba(232, 163, 61, 0.12);
+  --amber-22: rgba(232, 163, 61, 0.22);
+  --amber-30: rgba(232, 163, 61, 0.3);
+  --purple-05: rgba(107, 91, 165, 0.05);
+}
+
+/* ===== 主题变量：light（白色） ===== */
+[data-theme='light'] {
+  --paper-bg: #FFFFFF;
+  --paper-card: #FFFFFF;
+  --paper-deep: #F3F4F6;
+  --ink: #1A1A1A;
+  --ink-secondary: #6B7280;
+  --ink-tertiary: #9CA3AF;
+  --red-pen: #E34A3E;
+  --red-pen-deep: #B3261E;
+  --blue-ink: #3B5BA5;
+  --amber: #E8A33D;
+  --amber-deep: #9A6A00;
+  --success-green: #4C8A3D;
+  --success-green-08: rgba(76, 138, 61, 0.08);
+  --border: rgba(20, 20, 25, 0.12);
+  --border-light: rgba(20, 20, 25, 0.08);
+  --shadow-warm: 0 1px 2px rgba(20, 20, 25, 0.05), 0 1px 1px rgba(20, 20, 25, 0.03);
+  --shadow-warm-lg: 0 2px 8px rgba(20, 20, 25, 0.06), 0 1px 3px rgba(20, 20, 25, 0.05);
+  --shadow-card: 0 4px 24px rgba(20, 20, 25, 0.06), 0 1px 4px rgba(20, 20, 25, 0.04);
+  --bg-overlay-rgb: 255 255 255;
+
+  --paper-bg-40: rgba(255, 255, 255, 0.4);
+  --paper-bg-50: rgba(255, 255, 255, 0.5);
+  --paper-bg-80: rgba(255, 255, 255, 0.8);
+  --paper-bg-85: rgba(255, 255, 255, 0.85);
+  --paper-bg-90: rgba(255, 255, 255, 0.9);
+  --paper-deep-50: rgba(243, 244, 246, 0.5);
+  --paper-deep-60: rgba(243, 244, 246, 0.6);
+  --paper-deep-80: rgba(243, 244, 246, 0.8);
+  --ink-alpha-04: rgba(20, 20, 25, 0.04);
+  --ink-alpha-06: rgba(20, 20, 25, 0.06);
+  --ink-alpha-08: rgba(20, 20, 25, 0.08);
+  --ink-alpha-10: rgba(20, 20, 25, 0.1);
+  --ink-alpha-12: rgba(20, 20, 25, 0.12);
+  --ink-alpha-15: rgba(20, 20, 25, 0.15);
+  --ink-alpha-18: rgba(20, 20, 25, 0.18);
+  --ink-alpha-30: rgba(20, 20, 25, 0.3);
+  --blue-ink-02: rgba(59, 91, 165, 0.02);
+  --blue-ink-04: rgba(59, 91, 165, 0.04);
+  --blue-ink-05: rgba(59, 91, 165, 0.05);
+  --blue-ink-06: rgba(59, 91, 165, 0.06);
+  --blue-ink-08: rgba(59, 91, 165, 0.08);
+  --blue-ink-10: rgba(59, 91, 165, 0.1);
+  --blue-ink-25: rgba(59, 91, 165, 0.25);
+  --blue-ink-35: rgba(59, 91, 165, 0.35);
+  --red-pen-04: rgba(227, 74, 62, 0.04);
+  --red-pen-05: rgba(227, 74, 62, 0.05);
+  --red-pen-08: rgba(227, 74, 62, 0.08);
+  --red-pen-10: rgba(227, 74, 62, 0.1);
+  --red-pen-18: rgba(227, 74, 62, 0.18);
+  --red-pen-deep-12: rgba(179, 38, 30, 0.12);
+  --amber-06: rgba(232, 163, 61, 0.06);
+  --amber-07: rgba(232, 163, 61, 0.07);
+  --amber-12: rgba(232, 163, 61, 0.12);
+  --amber-22: rgba(232, 163, 61, 0.22);
+  --amber-30: rgba(232, 163, 61, 0.3);
+  --purple-05: rgba(107, 91, 165, 0.05);
+}
+
+/* ===== 主题变量：dark（黑色） ===== */
+[data-theme='dark'] {
+  --paper-bg: #121417;
+  --paper-card: #1C1F24;
+  --paper-deep: #262A30;
+  --ink: #E6E8EB;
+  --ink-secondary: #9AA0A6;
+  --ink-tertiary: #6E747C;
+  --red-pen: #F0604F;
+  --red-pen-deep: #FF6B5E;
+  --blue-ink: #5B8DEF;
+  --amber: #E8B04D;
+  --amber-deep: #C99A3A;
+  --success-green: #52C41A;
+  --success-green-08: rgba(82, 196, 26, 0.14);
+  --border: rgba(255, 255, 255, 0.12);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --shadow-warm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+  --shadow-warm-lg: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4), 0 1px 4px rgba(0, 0, 0, 0.3);
+  --bg-overlay-rgb: 18 20 23;
+  --font-kai: 'LXGW WenKai', 'KaiTi', 'STKaiti', '楷体', serif;
+  --font-mono: Consolas, 'Cascadia Mono', 'Courier New', monospace;
+
+  --paper-bg-40: rgba(18, 20, 23, 0.4);
+  --paper-bg-50: rgba(18, 20, 23, 0.5);
+  --paper-bg-80: rgba(18, 20, 23, 0.8);
+  --paper-bg-85: rgba(18, 20, 23, 0.85);
+  --paper-bg-90: rgba(18, 20, 23, 0.9);
+  --paper-deep-50: rgba(38, 42, 48, 0.5);
+  --paper-deep-60: rgba(38, 42, 48, 0.6);
+  --paper-deep-80: rgba(38, 42, 48, 0.8);
+  --ink-alpha-04: rgba(230, 232, 235, 0.04);
+  --ink-alpha-06: rgba(230, 232, 235, 0.06);
+  --ink-alpha-08: rgba(230, 232, 235, 0.08);
+  --ink-alpha-10: rgba(230, 232, 235, 0.1);
+  --ink-alpha-12: rgba(230, 232, 235, 0.12);
+  --ink-alpha-15: rgba(230, 232, 235, 0.15);
+  --ink-alpha-18: rgba(230, 232, 235, 0.18);
+  --ink-alpha-30: rgba(230, 232, 235, 0.3);
+  --blue-ink-02: rgba(91, 141, 239, 0.08);
+  --blue-ink-04: rgba(91, 141, 239, 0.12);
+  --blue-ink-05: rgba(91, 141, 239, 0.14);
+  --blue-ink-06: rgba(91, 141, 239, 0.14);
+  --blue-ink-08: rgba(91, 141, 239, 0.16);
+  --blue-ink-10: rgba(91, 141, 239, 0.18);
+  --blue-ink-25: rgba(91, 141, 239, 0.3);
+  --blue-ink-35: rgba(91, 141, 239, 0.4);
+  --red-pen-04: rgba(240, 96, 79, 0.08);
+  --red-pen-05: rgba(240, 96, 79, 0.1);
+  --red-pen-08: rgba(240, 96, 79, 0.12);
+  --red-pen-10: rgba(240, 96, 79, 0.14);
+  --red-pen-18: rgba(240, 96, 79, 0.22);
+  --red-pen-deep-12: rgba(255, 107, 94, 0.16);
+  --amber-06: rgba(232, 176, 77, 0.08);
+  --amber-07: rgba(232, 176, 77, 0.1);
+  --amber-12: rgba(232, 176, 77, 0.16);
+  --amber-22: rgba(232, 176, 77, 0.24);
+  --amber-30: rgba(232, 176, 77, 0.32);
+  --purple-05: rgba(160, 140, 220, 0.12);
+}
 
 * {
   margin: 0;
@@ -8,47 +193,76 @@
 
 html, body, #root {
   height: 100%;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #F2F2F7;
-  color: #1D1D1F;
+  background: var(--paper-bg);
+  color: var(--ink);
 }
 
-/* Glass effect — 磨砂玻璃 */
+/* 品牌标题 — 楷体（笔记本手写感） */
+.font-kai {
+  font-family: var(--font-kai);
+}
+
+/* 自定义背景图时：#root 与内容层透明，让 body 的照片 + 遮罩透出 */
+[data-custom-bg] #root {
+  background: transparent;
+}
+
+/* 笔记本页眉（替代磨砂玻璃） */
 .glass {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(60, 60, 67, 0.08);
+  background: var(--paper-bg-90);
+  border-bottom: 1px solid var(--border-light);
 }
 
-/* Card with elevation */
+/* 白纸卡片 */
 .card-elevated {
-  background: #FFFFFF;
-  border-radius: 14px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+  background: var(--paper-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: var(--shadow-warm);
   transition: box-shadow 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 .card-elevated:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-warm-lg);
+}
+
+/* 横线纸纹理（答题区/笔记区） */
+.paper-lines {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 27px,
+    var(--ink-alpha-06) 27px,
+    var(--ink-alpha-06) 28px
+  );
+  background-color: var(--paper-card);
+}
+
+/* 红笔划掉（批改时刻） */
+.red-pen-strike {
+  color: var(--red-pen);
+  text-decoration: line-through;
+  text-decoration-color: var(--red-pen);
+  text-decoration-thickness: 2px;
 }
 
 /* Section title */
 .section-title {
   font-size: 20px;
   font-weight: 600;
-  color: #1D1D1F;
-  letter-spacing: -0.02em;
+  font-family: var(--font-kai);
+  color: var(--ink);
+  letter-spacing: 0.02em;
 }
 
 .text-secondary {
-  color: #86868B;
+  color: var(--ink-secondary);
 }
 
 .text-tertiary {
-  color: #AEAEB2;
+  color: var(--ink-tertiary);
 }
 
 /* Custom scrollbar */
@@ -62,19 +276,19 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(60, 60, 67, 0.18);
+  background: var(--ink-alpha-18);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(60, 60, 67, 0.3);
+  background: var(--ink-alpha-30);
 }
 
-/* Ant Design overrides for Apple style */
+/* Ant Design 纸本化覆写 */
 .ant-menu-item {
   margin: 2px 8px !important;
   width: auto !important;
-  border-radius: 8px !important;
+  border-radius: 6px !important;
   transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1) !important;
 }
 
@@ -88,15 +302,25 @@ html, body, #root {
 }
 
 .ant-btn-primary {
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
+  box-shadow: 0 1px 4px rgba(59, 91, 165, 0.25);
 }
 
 .ant-btn-primary:hover {
-  box-shadow: 0 4px 14px rgba(0, 122, 255, 0.4);
+  box-shadow: 0 2px 8px rgba(59, 91, 165, 0.35);
 }
 
 .ant-card {
   transition: box-shadow 0.25s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* 题号/日期等数据 — 等宽字体 */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* KaTeX 跟随主题文字色（dark 下可读） */
+.katex {
+  color: var(--ink);
 }
 
 /* Markdown preview */
@@ -105,6 +329,35 @@ html, body, #root {
 .ProseMirror img {
   max-width: 100%;
   height: auto;
+}
+
+/* 列表：全局 reset 清掉了 ul/ol 缩进，恢复默认留白，避免项目符号跑出容器边界 */
+.markdown-body ul,
+.markdown-body ol,
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-inline-start: 1.5em;
+  margin-block: 0.5em;
+}
+.markdown-body li,
+.markdown-preview li {
+  margin-bottom: 0.25em;
+}
+
+/* AI 答疑"绑定题目"下拉选项：3 行截断 + 图片限高，避免选项被撑爆 */
+.bind-option {
+  display: block;
+  max-height: 4.8em;
+  overflow: hidden;
+  line-height: 1.6;
+}
+.bind-option img {
+  max-height: 36px;
+  width: auto;
+  vertical-align: middle;
+}
+.bind-option .katex {
+  font-size: 1em;
 }
 .markdown-preview .katex-display {
   margin: 12px 0;

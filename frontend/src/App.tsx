@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, App as AntApp } from 'antd';
 import { AuthProvider } from './store/AuthContext';
+import { ThemeProvider, useTheme } from './store/ThemeProvider';
+import { themes } from './styles/theme';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import AppLayout from './components/layout/AppLayout';
 import LoginPage from './pages/LoginPage';
@@ -21,11 +23,11 @@ import PDFImportPage from './pages/PDFImportPage';
 import BatchEditPage from './pages/BatchEditPage';
 import AIChatPage from './pages/AIChatPage';
 import SelectQuestionsPage from './pages/SelectQuestionsPage';
-import appleTheme from './styles/theme';
 
-export default function App() {
+function ThemedApp() {
+  const { theme } = useTheme();
   return (
-    <ConfigProvider theme={appleTheme}>
+    <ConfigProvider theme={themes[theme]}>
       <AntApp>
         <AuthProvider>
           <BrowserRouter>
@@ -58,5 +60,13 @@ export default function App() {
         </AuthProvider>
       </AntApp>
     </ConfigProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   );
 }

@@ -53,13 +53,13 @@ export default function ReviewResultPage() {
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {[
-          { label: '总题数', value: summary.total_count, color: '#1D1D1F' },
-          { label: '正确', value: summary.correct_count, color: '#34C759' },
-          { label: '错误', value: summary.wrong_count, color: '#FF3B30' },
-          { label: '正确率', value: `${accuracy}%`, color: '#007AFF' },
+          { label: '总题数', value: summary.total_count, color: 'var(--ink)' },
+          { label: '正确', value: summary.correct_count, color: 'var(--success-green)' },
+          { label: '错误', value: summary.wrong_count, color: 'var(--red-pen-deep)' },
+          { label: '正确率', value: `${accuracy}%`, color: 'var(--blue-ink)' },
         ].map((s) => (
           <Col xs={12} sm={6} key={s.label}>
-            <Card className="card-elevated" style={{ borderRadius: 14, textAlign: 'center' }}>
+            <Card className="card-elevated" style={{ borderRadius: 10, textAlign: 'center' }}>
               <Text className="text-secondary" style={{ fontSize: 13 }}>{s.label}</Text>
               <div style={{ fontSize: 28, fontWeight: 700, color: s.color, marginTop: 4 }}>{s.value}</div>
             </Card>
@@ -68,13 +68,13 @@ export default function ReviewResultPage() {
       </Row>
 
       {summary.questions?.length > 0 && (
-        <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+        <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
           <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 12 }}>作答详情</Text>
           {(summary.questions || []).map((q: any, i: number) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid rgba(60,60,67,0.04)' }}>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--ink-alpha-04)' }}>
                 {q.is_correct
-                  ? <CheckCircleFilled style={{ fontSize: 20, color: '#34C759' }} />
-                  : <CloseCircleFilled style={{ fontSize: 20, color: '#FF3B30' }} />
+                  ? <CheckCircleFilled style={{ fontSize: 20, color: 'var(--success-green)' }} />
+                  : <CloseCircleFilled style={{ fontSize: 20, color: 'var(--red-pen-deep)' }} />
                 }
                 <div>
                   <Text>{`第 ${i + 1} 题`}</Text>

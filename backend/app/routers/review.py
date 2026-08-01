@@ -11,8 +11,8 @@ router = APIRouter(prefix="/api/review", tags=["review"])
 
 
 @router.get("/sessions")
-def list_sessions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    return review_service.list_user_sessions(db, current_user.id)
+def list_sessions(page: int = 1, page_size: int = 20, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return review_service.list_user_sessions(db, current_user.id, page=page, page_size=page_size)
 
 
 @router.post("/sessions")

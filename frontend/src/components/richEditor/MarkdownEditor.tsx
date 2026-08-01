@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react';
-import { Button, Space, Upload, message, Tooltip } from 'antd';
+import { Button, Upload, message, Tooltip } from 'antd';
 import {
   BoldOutlined, ItalicOutlined, OrderedListOutlined, UnorderedListOutlined,
   PictureOutlined, LinkOutlined, FontSizeOutlined, FunctionOutlined,
@@ -76,29 +76,29 @@ export default function MarkdownEditor({ value, onChange, placeholder }: Props) 
   ];
 
   return (
-    <div style={{ border: '1px solid rgba(60,60,67,0.10)', borderRadius: 8, overflow: 'hidden' }}>
+    <div style={{ border: '1px solid var(--ink-alpha-10)', borderRadius: 8, overflow: 'hidden' }}>
       <div
         style={{
           display: 'flex', flexWrap: 'wrap', gap: 2, padding: '6px 8px',
-          borderBottom: '1px solid rgba(60,60,67,0.06)',
-          background: 'rgba(242,242,247,0.5)',
+          borderBottom: '1px solid var(--ink-alpha-06)',
+          background: 'var(--paper-deep-50)',
         }}
       >
         {toolbarItems.map((item, i) => {
           if ('type' in item && item.type === 'divider') {
-            return <div key={i} style={{ width: 1, background: 'rgba(60,60,67,0.1)', margin: '0 4px' }} />;
+            return <div key={i} style={{ width: 1, background: 'var(--ink-alpha-10)', margin: '0 4px' }} />;
           }
           const btn = item as { icon: React.ReactNode; title: string; action: () => void };
           return (
             <Tooltip title={btn.title} key={i}>
               <Button type="text" size="small" icon={btn.icon} onClick={btn.action}
-                style={{ color: '#86868B', borderRadius: 4 }} />
+                style={{ color: 'var(--ink-secondary)', borderRadius: 4 }} />
             </Tooltip>
           );
         })}
         <Upload showUploadList={false} accept="image/*" beforeUpload={handleImageUpload}>
           <Tooltip title="图片">
-            <Button type="text" size="small" icon={<PictureOutlined />} style={{ color: '#86868B', borderRadius: 4 }} />
+            <Button type="text" size="small" icon={<PictureOutlined />} style={{ color: 'var(--ink-secondary)', borderRadius: 4 }} />
           </Tooltip>
         </Upload>
       </div>
@@ -110,7 +110,7 @@ export default function MarkdownEditor({ value, onChange, placeholder }: Props) 
         style={{
           width: '100%', minHeight: 300, maxHeight: 500, padding: '12px 16px',
           fontSize: 14, lineHeight: 1.8, fontFamily: '"Cascadia Code", "Consolas", "SF Mono", monospace',
-          border: 'none', outline: 'none', resize: 'vertical', background: '#fff',
+          border: 'none', outline: 'none', resize: 'vertical', background: 'var(--paper-card)',
           overflow: 'auto',
         }}
       />

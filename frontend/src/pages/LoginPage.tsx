@@ -33,22 +33,23 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#F2F2F7',
+        background: 'transparent',
         padding: 24,
       }}
     >
       <div
         style={{
           width: 400,
-          background: '#FFFFFF',
-          borderRadius: 16,
+          background: 'var(--paper-card)',
+          border: '1px solid var(--ink-alpha-10)',
+          borderRadius: 12,
           padding: '40px 36px',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)',
+          boxShadow: 'var(--shadow-card)',
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <Title level={3} style={{ fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>
-            错题集
+          <Title level={3} className="font-kai" style={{ fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
+            ✎ 错题本
           </Title>
           <Text className="text-secondary">登录你的账户</Text>
         </div>
@@ -59,7 +60,7 @@ export default function LoginPage() {
             rules={[{ required: true, message: '请输入用户名或邮箱' }]}
           >
             <Input
-              prefix={<UserOutlined style={{ color: '#86868B' }} />}
+              prefix={<UserOutlined style={{ color: 'var(--ink-secondary)' }} />}
               placeholder="用户名或邮箱"
             />
           </Form.Item>
@@ -69,7 +70,7 @@ export default function LoginPage() {
             rules={[{ required: true, message: '请输入密码' }]}
           >
             <Input.Password
-              prefix={<LockOutlined style={{ color: '#86868B' }} />}
+              prefix={<LockOutlined style={{ color: 'var(--ink-secondary)' }} />}
               placeholder="密码"
             />
           </Form.Item>

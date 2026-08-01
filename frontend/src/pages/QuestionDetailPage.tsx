@@ -94,10 +94,10 @@ export default function QuestionDetailPage() {
   if (loading) return (
     <div style={{ maxWidth: 860 }}>
       <Skeleton.Input active size="small" style={{ marginBottom: 12, width: 100, borderRadius: 8 }} />
-      <Skeleton.Input active block style={{ height: 180, marginBottom: 16, borderRadius: 14 }} />
-      <Skeleton.Input active block style={{ height: 160, marginBottom: 16, borderRadius: 14 }} />
-      <Skeleton.Input active block style={{ height: 140, marginBottom: 16, borderRadius: 14 }} />
-      <Skeleton.Input active block style={{ height: 120, borderRadius: 14 }} />
+      <Skeleton.Input active block style={{ height: 180, marginBottom: 16, borderRadius: 10 }} />
+      <Skeleton.Input active block style={{ height: 160, marginBottom: 16, borderRadius: 10 }} />
+      <Skeleton.Input active block style={{ height: 140, marginBottom: 16, borderRadius: 10 }} />
+      <Skeleton.Input active block style={{ height: 120, borderRadius: 10 }} />
     </div>
   );
   if (!question) return <Empty description="题目不存在" />;
@@ -109,7 +109,7 @@ export default function QuestionDetailPage() {
         const hasOptionText = ans.options.some((o: string) => o?.trim());
         if (!hasOptionText && ans.correct?.length > 0) {
           return (
-            <div style={{ color: showAnswer ? '#34C759' : '#1D1D1F' }}>
+            <div style={{ color: showAnswer ? 'var(--red-pen)' : 'var(--ink)' }}>
               正确答案：{ans.correct.join('、')}
             </div>
           );
@@ -120,7 +120,7 @@ export default function QuestionDetailPage() {
               const letter = String.fromCharCode(65 + i);
               const isCorrect = ans.correct?.includes(letter);
               return (
-                <div key={i} style={{ padding: '4px 0', color: showAnswer && isCorrect ? '#34C759' : '#1D1D1F', fontWeight: showAnswer && isCorrect ? 600 : 400 }}>
+                <div key={i} style={{ padding: '4px 0', color: showAnswer && isCorrect ? 'var(--red-pen)' : 'var(--ink)', fontWeight: showAnswer && isCorrect ? 600 : 400 }}>
                   {letter}. {o} {showAnswer && isCorrect && '✓'}
                 </div>
               );
@@ -142,11 +142,11 @@ export default function QuestionDetailPage() {
 
   return (
     <div style={{ maxWidth: 860 }}>
-      <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/questions')} style={{ marginBottom: 12, color: '#86868B' }}>
+      <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/questions')} style={{ marginBottom: 12, color: 'var(--ink-secondary)' }}>
         返回错题库
       </Button>
 
-      <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+      <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             <Space size={8} style={{ marginBottom: 16 }}>
@@ -162,7 +162,7 @@ export default function QuestionDetailPage() {
         <MarkdownViewer content={question.content} />
       </Card>
 
-      <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+      <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <Text strong style={{ fontSize: 16 }}>答案与解析</Text>
           {!showAnswer ? (
@@ -173,13 +173,13 @@ export default function QuestionDetailPage() {
         </div>
         {showAnswer && (
           <>
-            <div style={{ background: 'rgba(52,199,89,0.06)', padding: 16, borderRadius: 10, marginBottom: 16 }}>
-              <Text strong style={{ color: '#34C759' }}>正确答案</Text>
+            <div style={{ background: 'var(--red-pen-05)', padding: 16, borderRadius: 10, marginBottom: 16 }}>
+              <Text strong style={{ color: 'var(--red-pen)' }}>正确答案</Text>
               <div style={{ marginTop: 8 }}>{renderAnswer()}</div>
             </div>
             {question.explanation && (
-              <div style={{ background: 'rgba(0,122,255,0.04)', padding: 16, borderRadius: 10 }}>
-                <Text strong style={{ color: '#007AFF' }}>解析</Text>
+              <div style={{ background: 'var(--blue-ink-04)', padding: 16, borderRadius: 10 }}>
+                <Text strong style={{ color: 'var(--blue-ink)' }}>解析</Text>
                 <div style={{ marginTop: 8 }}>
                   <MarkdownViewer content={question.explanation} />
                 </div>
@@ -195,10 +195,10 @@ export default function QuestionDetailPage() {
       </Card>
 
       {/* Notes */}
-      <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+      <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
         <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 16 }}>个人笔记</Text>
 
-        <div style={{ marginBottom: 16, padding: 12, background: 'rgba(242,242,247,0.4)', borderRadius: 10 }}>
+        <div style={{ marginBottom: 16, padding: 12, background: 'var(--paper-deep-50)', borderRadius: 10 }}>
           <MarkdownEditor value={newNote} onChange={setNewNote} placeholder="写一条笔记..." />
           <Button type="primary" size="small" icon={<PlusOutlined />} onClick={handleAddNote}
             loading={noteSaving} disabled={!newNote.trim()}
@@ -212,7 +212,7 @@ export default function QuestionDetailPage() {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {notes.map((n) => (
-              <div key={n.id} style={{ padding: 14, background: 'rgba(242,242,247,0.3)', borderRadius: 10 }}>
+              <div key={n.id} style={{ padding: 14, background: 'var(--paper-deep-50)', borderRadius: 10 }}>
                 {editingNoteId === n.id ? (
                   <div>
                     <MarkdownEditor value={editingContent} onChange={setEditingContent} placeholder="编辑笔记..." />
@@ -234,7 +234,7 @@ export default function QuestionDetailPage() {
                       <Space size={4}>
                         <Button type="text" size="small" icon={<EditOutlined />}
                           onClick={() => { setEditingNoteId(n.id); setEditingContent(n.content); }}
-                          style={{ color: '#007AFF', fontSize: 12 }}>编辑</Button>
+                          style={{ color: 'var(--blue-ink)', fontSize: 12 }}>编辑</Button>
                         <Popconfirm title="删除这条笔记？" onConfirm={() => handleDeleteNote(n.id)}>
                           <Button type="text" size="small" danger icon={<DeleteOutlined />}
                             style={{ fontSize: 12 }}>删除</Button>
@@ -249,7 +249,7 @@ export default function QuestionDetailPage() {
         )}
       </Card>
 
-      <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+      <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
         <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 12 }}>统计</Text>
         <Descriptions column={4} size="small">
           <Descriptions.Item label="总作答次数">{question.total_attempts}</Descriptions.Item>

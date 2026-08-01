@@ -49,15 +49,21 @@ export async function streamSSE(
       for (const part of parts) {
         for (const line of part.split('\n')) {
           if (!line.startsWith('data: ')) continue;
-          const chunk = line.slice(6);
-          if (chunk === '[DONE]') {
+          const raw = line.slice(6);
+          if (raw === '[DONE]') {
             handlers.onDone(full);
             return;
           }
-          if (chunk.startsWith('[ERROR]')) {
-            handlers.onError(chunk.slice(7));
+          if (raw.startsWith('[ERROR]')) {
+            handlers.onError(raw.slice(7));
             return;
           }
+          // 后端以 JSON 编码内容块（SSE data 行不能含裸换行），解析还原；兼容非 JSON 旧格式
+          let chunk = raw;
+          try {
+            const parsed = JSON.parse(raw);
+            if (typeof parsed === 'string') chunk = parsed;
+          } catch {}
           full += chunk;
           handlers.onToken(full);
         }

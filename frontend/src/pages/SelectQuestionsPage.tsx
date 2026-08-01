@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, Typography, Select, Input, Button, Checkbox, Space, Tag, message, Row, Col } from 'antd';
 import { PlayCircleOutlined, SearchOutlined } from '@ant-design/icons';
@@ -35,26 +35,33 @@ export default function SelectQuestionsPage() {
 
   // Filters
   const [subjectId, setSubjectId] = useState<number | undefined>();
-  const [typeId, setTypeId] = useState<number | undefined>();
+  const [typeId, setTypeId] = useState<string | undefined>();
   const [tagId, setTagId] = useState<number | undefined>();
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [sort, setSort] = useState('created_at_desc');
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const [types, setTypes] = useState<{ id: number; name: string }[]>([]);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
-    subjectsApi.list().then(({ data }) => {
-      setSubjects(data);
-      // Flatten types from all subjects
-      const allTypes: { id: number; name: string }[] = [];
-      (data as Subject[]).forEach((s) => {
-        (s.question_types || []).forEach((t) => allTypes.push(t));
-      });
-      setTypes(allTypes);
-    }).catch(() => {});
+    subjectsApi.list().then(({ data }) => setSubjects(data)).catch(() => {});
     tagsApi.list().then(({ data }) => setTags(data)).catch(() => {});
   }, []);
+
+  // 按题型名合并：同名题型（各学科各一个）归为一类，value 为逗号分隔的 type_id 列表
+  const typeOptions = useMemo(() => {
+    const map = new Map<string, number[]>();
+    subjects.forEach((s) =>
+      (s.question_types || []).forEach((t) => {
+        const ids = map.get(t.name) || [];
+        ids.push(t.id);
+        map.set(t.name, ids);
+      }),
+    );
+    return Array.from(map.entries()).map(([name, ids]) => ({
+      label: name,
+      value: ids.join(','),
+    }));
+  }, [subjects]);
 
   const handleKeywordChange = (value: string) => {
     setKeyword(value);
@@ -126,7 +133,7 @@ export default function SelectQuestionsPage() {
         </Space>
         <Space>
           <Text className="text-secondary" style={{ fontSize: 13 }}>
-            已选 <Text strong style={{ color: '#007AFF', fontSize: 16 }}>{selected.size}</Text> 题
+            已选 <Text strong style={{ color: 'var(--blue-ink)', fontSize: 16 }}>{selected.size}</Text> 题
           </Text>
           <Button type="primary" size="large" icon={<PlayCircleOutlined />}
             loading={creating} onClick={startReview} disabled={selected.size === 0}
@@ -143,9 +150,9 @@ export default function SelectQuestionsPage() {
           <Select placeholder="学科" allowClear style={{ width: 140 }}
             value={subjectId} onChange={(v) => { setSubjectId(v); setTypeId(undefined); }}
             options={subjects.map((s) => ({ label: s.name, value: s.id }))} />
-          <Select placeholder="题型" allowClear style={{ width: 140 }}
+          <Select placeholder="题型" allowClear style={{ width: 160 }}
             value={typeId} onChange={setTypeId}
-            options={types.map((t) => ({ label: t.name, value: t.id }))} />
+            options={typeOptions} />
           <Select placeholder="标签" allowClear style={{ width: 140 }}
             value={tagId} onChange={setTagId}
             options={tags.map((t) => ({ label: t.name, value: t.id }))} />
@@ -175,8 +182,8 @@ export default function SelectQuestionsPage() {
                 className="card-elevated"
                 style={{
                   borderRadius: 14, cursor: 'pointer', height: '100%',
-                  border: isSelected ? '2px solid #007AFF' : '1px solid rgba(60,60,67,0.08)',
-                  background: isSelected ? 'rgba(0,122,255,0.02)' : '#fff',
+                  border: isSelected ? '2px solid var(--blue-ink)' : '1px solid var(--ink-alpha-08)',
+                  background: isSelected ? 'var(--blue-ink-02)' : 'var(--paper-card)',
                   transition: 'all 0.15s',
                 }}
                 bodyStyle={{ padding: '14px 16px' }}
@@ -208,7 +215,7 @@ export default function SelectQuestionsPage() {
                       </Text>
                       <Text style={{
                         fontSize: 12,
-                        color: q.accuracy >= 60 ? '#34C759' : q.accuracy > 0 ? '#FF9500' : '#86868B',
+                        color: q.accuracy >= 60 ? 'var(--red-pen)' : q.accuracy > 0 ? 'var(--amber)' : 'var(--ink-secondary)',
                         fontWeight: 500,
                       }}>
                         正确率 {Math.round(q.accuracy * 100) / 100}%

@@ -83,13 +83,20 @@ def _export_json(db: Session, user: User, questions: list[Question], fmt: str):
         os.makedirs(temp_dir, exist_ok=True)
         zip_name = f"export_{uuid.uuid4().hex[:8]}.zip"
         zip_path = os.path.join(temp_dir, zip_name)
+        upload_root = os.path.normpath(settings.UPLOAD_ROOT)
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("data.json", json.dumps(data, ensure_ascii=False, indent=2))
             for q in questions:
                 urls = re.findall(r'src="(/uploads/[^"]+)"', q.content or "")
                 for url in urls:
-                    img_path = os.path.join(settings.UPLOAD_ROOT, url.replace("/uploads/", ""))
-                    if os.path.exists(img_path):
+                    # 防路径穿越：拒绝含 .. 或反斜杠的 URL，并校验解析后仍在 UPLOAD_ROOT 内
+                    if ".." in url or "\\" in url:
+                        continue
+                    rel = url[len("/uploads/"):]
+                    img_path = os.path.normpath(os.path.join(upload_root, rel))
+                    if img_path != upload_root and not img_path.startswith(upload_root + os.sep):
+                        continue
+                    if os.path.isfile(img_path):
                         zf.write(img_path, os.path.join("images", os.path.basename(img_path)))
 
         # Use a background cleanup after response is sent

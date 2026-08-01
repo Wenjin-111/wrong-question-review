@@ -320,12 +320,18 @@ def get_today_pending(db: Session, user_id: int) -> int:
     return len(_get_due_question_ids(db, user_id))
 
 
-def list_user_sessions(db: Session, user_id: int, limit: int = 20) -> list[dict]:
+def list_user_sessions(db: Session, user_id: int, page: int = 1, page_size: int = 20) -> dict:
+    total = (
+        db.query(func.count(ReviewSession.id))
+        .filter(ReviewSession.user_id == user_id)
+        .scalar()
+    ) or 0
     sessions = (
         db.query(ReviewSession)
         .filter(ReviewSession.user_id == user_id)
         .order_by(ReviewSession.started_at.desc())
-        .limit(limit)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
     result = []
@@ -341,7 +347,7 @@ def list_user_sessions(db: Session, user_id: int, limit: int = 20) -> list[dict]
             "started_at": s.started_at.isoformat(),
             "finished_at": s.finished_at.isoformat() if s.finished_at else None,
         })
-    return result
+    return {"total": total, "items": result}
 
 
 def get_session_for_resume(db: Session, user_id: int, session_id: int) -> dict:

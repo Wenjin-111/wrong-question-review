@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Card, Typography, Button, Form, Select, Input, message, Row, Col,
-  Tag, Divider, Radio, Checkbox, Progress, Space, Popconfirm, Modal, Empty,
+  Tag, Divider, Radio, Checkbox, Progress, Space, Popconfirm, Empty,
 } from 'antd';
 import {
   PlusOutlined, DeleteOutlined, SaveOutlined, ArrowLeftOutlined,
@@ -11,6 +11,8 @@ import {
 import { subjectsApi } from '../api/subjects';
 import { tagsApi } from '../api/tags';
 import { questionsApi } from '../api/questions';
+import { useTheme } from '../store/ThemeProvider';
+import { getCssVar } from '../utils/themeVars';
 import MarkdownEditor from '../components/richEditor/MarkdownEditor';
 import type { Subject, Tag as TagType, QuestionType } from '../types';
 
@@ -31,6 +33,7 @@ interface BatchQuestion {
   aiType: string;
   saved: boolean;
   saving: boolean;
+  questionTypeId: number | undefined;
   // Parsed answer form state
   answerType: 'choice' | 'fill' | 'subjective';
   options: string[];
@@ -88,9 +91,11 @@ function buildAnswerJson(q: BatchQuestion): string {
 }
 
 export default function BatchEditPage() {
+  useTheme(); // 订阅主题变化（Progress strokeColor 需重渲染刷新）
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { questions?: RawQuestion[]; raw_text?: string } | null;
+  const state = location.state as { questions?: RawQuestion[]; raw_text?: string; source?: string } | null;
+  const isOcrEntry = state?.source === 'ocr';
 
   const [questions, setQuestions] = useState<BatchQuestion[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
@@ -119,6 +124,7 @@ export default function BatchEditPage() {
         aiType: raw.type || 'subjective',
         saved: false,
         saving: false,
+        questionTypeId: undefined,
         ...parseInitialAnswer(raw),
       }));
       setQuestions(list);
@@ -139,7 +145,13 @@ export default function BatchEditPage() {
 
   const handleSubjectChange = (sid: number) => {
     const s = subjects.find((x) => x.id === sid);
-    setQuestionTypes(s?.question_types || []);
+    const types = s?.question_types || [];
+    setQuestionTypes(types);
+    // 学科变化后，未保存题目的题型重置为第一个可用题型
+    const defaultTypeId = types[0]?.id;
+    setQuestions((prev) =>
+      prev.map((q) => (q.saved ? q : { ...q, questionTypeId: defaultTypeId })),
+    );
   };
 
   const saveOne = async (id: string) => {
@@ -150,7 +162,7 @@ export default function BatchEditPage() {
       message.warning('请先选择学科');
       return;
     }
-    const typeId = questionTypes.length > 0 ? questionTypes[0].id : undefined;
+    const typeId = q.questionTypeId ?? questionTypes[0]?.id;
     if (!typeId) {
       message.warning('该学科下无可用题型');
       return;
@@ -180,11 +192,6 @@ export default function BatchEditPage() {
       message.warning('请先选择学科');
       return;
     }
-    const typeId = questionTypes.length > 0 ? questionTypes[0].id : undefined;
-    if (!typeId) {
-      message.warning('该学科下无可用题型');
-      return;
-    }
 
     const unsaved = questions.filter((q) => !q.saved);
     if (unsaved.length === 0) {
@@ -195,6 +202,11 @@ export default function BatchEditPage() {
     setSavingAll(true);
     let done = 0;
     for (const q of unsaved) {
+      const typeId = q.questionTypeId ?? questionTypes[0]?.id;
+      if (!typeId) {
+        message.warning('部分题目未选择题型，已跳过');
+        continue;
+      }
       updateQuestion(q.id, { saving: true });
       try {
         await questionsApi.create({
@@ -265,7 +277,7 @@ export default function BatchEditPage() {
     }
   };
 
-  const getAnswerTypeFromTypeName = (name: string): string | null => {
+  const getAnswerTypeFromTypeName = (name: string): 'choice' | 'fill' | 'subjective' | null => {
     if (/选择/.test(name)) return 'choice';
     if (/填空/.test(name)) return 'fill';
     if (/简答|问答|主观|论述/.test(name)) return 'subjective';
@@ -276,11 +288,11 @@ export default function BatchEditPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Space>
-          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/questions/pdf')}>
+          <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate(isOcrEntry ? '/questions/ocr' : '/questions/pdf')}>
             返回
           </Button>
           <Title level={4} style={{ fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
-            PDF 批量导入
+            {isOcrEntry ? '批量校对导入' : 'PDF 批量导入'}
           </Title>
         </Space>
         <Space>
@@ -291,7 +303,7 @@ export default function BatchEditPage() {
             percent={totalCount > 0 ? Math.round((savedCount / totalCount) * 100) : 0}
             size="small"
             style={{ width: 120, margin: 0 }}
-            strokeColor="#34C759"
+            strokeColor={getCssVar('--red-pen')}
           />
           <Popconfirm
             title="将用当前全局设置保存所有未保存的题目"
@@ -356,19 +368,19 @@ export default function BatchEditPage() {
                 style={{
                   padding: '12px 16px',
                   cursor: 'pointer',
-                  borderBottom: '1px solid rgba(60,60,67,0.06)',
-                  background: q.id === selectedId ? 'rgba(0,122,255,0.06)' : undefined,
-                  borderLeft: q.id === selectedId ? '3px solid #007AFF' : '3px solid transparent',
+                  borderBottom: '1px solid var(--ink-alpha-06)',
+                  background: q.id === selectedId ? 'var(--blue-ink-06)' : undefined,
+                  borderLeft: q.id === selectedId ? '3px solid var(--blue-ink)' : '3px solid transparent',
                   opacity: q.saved ? 0.7 : 1,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   {q.saved ? (
-                    <CheckCircleFilled style={{ color: '#34C759', fontSize: 14 }} />
+                    <CheckCircleFilled style={{ color: 'var(--red-pen)', fontSize: 14 }} />
                   ) : q.saving ? (
                     <Text className="text-secondary" style={{ fontSize: 12 }}>⏳</Text>
                   ) : (
-                    <ExclamationCircleOutlined style={{ color: '#FF9500', fontSize: 14 }} />
+                    <ExclamationCircleOutlined style={{ color: 'var(--amber)', fontSize: 14 }} />
                   )}
                   <Text strong style={{ fontSize: 13 }}>
                     题目 {idx + 1}
@@ -437,22 +449,42 @@ export default function BatchEditPage() {
               </div>
 
               {/* Question type */}
-              <Form.Item label="答案类型" style={{ marginBottom: 12 }}>
-                <Radio.Group
-                  value={selected.answerType}
-                  onChange={(e) => {
-                    const newType = e.target.value;
-                    updateQuestion(selected.id, {
-                      answerType: newType,
-                      answer: newType === 'choice' ? '' : newType === 'fill' ? '' : selected.referenceAnswer,
-                    });
-                  }}
-                >
-                  <Radio.Button value="choice">选择题</Radio.Button>
-                  <Radio.Button value="fill">填空题</Radio.Button>
-                  <Radio.Button value="subjective">主观题</Radio.Button>
-                </Radio.Group>
-              </Form.Item>
+              <Space wrap style={{ marginBottom: 12 }}>
+                <Form.Item label="题型" style={{ marginBottom: 0 }}>
+                  <Select
+                    value={selected.questionTypeId}
+                    onChange={(typeId: number) => {
+                      updateQuestion(selected.id, { questionTypeId: typeId });
+                      const name = questionTypes.find((t) => t.id === typeId)?.name || '';
+                      const mapped = getAnswerTypeFromTypeName(name);
+                      if (mapped && mapped !== selected.answerType) {
+                        updateQuestion(selected.id, { answerType: mapped });
+                      }
+                    }}
+                    options={questionTypes.map((t) => ({ label: t.name, value: t.id }))}
+                    placeholder="选择题型"
+                    style={{ width: 160 }}
+                    disabled={selected.saved}
+                  />
+                </Form.Item>
+                <Form.Item label="答案类型" style={{ marginBottom: 0 }}>
+                  <Radio.Group
+                    value={selected.answerType}
+                    onChange={(e) => {
+                      const newType = e.target.value;
+                      updateQuestion(selected.id, {
+                        answerType: newType,
+                        answer: newType === 'choice' ? '' : newType === 'fill' ? '' : selected.referenceAnswer,
+                      });
+                    }}
+                    disabled={selected.saved}
+                  >
+                    <Radio.Button value="choice">选择题</Radio.Button>
+                    <Radio.Button value="fill">填空题</Radio.Button>
+                    <Radio.Button value="subjective">主观题</Radio.Button>
+                  </Radio.Group>
+                </Form.Item>
+              </Space>
 
               {/* Content */}
               <div style={{ marginBottom: 16 }}>

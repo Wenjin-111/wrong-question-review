@@ -185,17 +185,39 @@ def get_batch_question_stats(db: Session, question_ids: list[int]) -> dict[int, 
     return result
 
 
+_TYPE_ABBR_EXACT = {
+    "选择题": "CT", "选择": "CT",
+    "填空题": "FT", "填空": "FT",
+    "简答题": "SA", "简答": "SA",
+    "问答题": "QA", "问答": "QA",
+    "主观题": "SB", "主观": "SB",
+    "判断题": "TF", "判断": "TF",
+    "论述题": "ES", "论述": "ES",
+    "客观题": "OB", "客观": "OB",
+    "计算题": "CA", "计算": "CA",
+    "解答题": "SA", "解答": "SA",
+    "证明题": "PR", "证明": "PR",
+    "应用题": "AP", "应用": "AP",
+}
+
+# 模糊匹配兜底：用户自定义题型名包含关键词时给出合理缩写
+_TYPE_ABBR_KEYWORDS = [
+    ("选择", "CT"), ("填空", "FT"), ("判断", "TF"), ("简答", "SA"),
+    ("问答", "QA"), ("论述", "ES"), ("主观", "SB"), ("客观", "OB"),
+    ("计算", "CA"), ("解答", "SA"), ("证明", "PR"), ("应用", "AP"),
+]
+
+
 def get_type_abbr(type_name: str) -> str:
-    mapping = {
-        "选择题": "CT", "选择": "CT",
-        "填空题": "FT", "填空": "FT",
-        "简答题": "SA", "简答": "SA",
-        "问答题": "QA", "问答": "QA",
-        "主观题": "SB", "主观": "SB",
-        "判断题": "TF", "判断": "TF",
-        "论述题": "ES", "论述": "ES",
-    }
-    return mapping.get(type_name, type_name[:2])
+    if not type_name:
+        return "OT"
+    if type_name in _TYPE_ABBR_EXACT:
+        return _TYPE_ABBR_EXACT[type_name]
+    for keyword, abbr in _TYPE_ABBR_KEYWORDS:
+        if keyword in type_name:
+            return abbr
+    # 不认识的题型不再截取中文前两字，统一归为 OT（Other）
+    return "OT"
 
 
 def compute_question_codes(db: Session, user_id: int, questions: list[Question]) -> dict[int, str]:

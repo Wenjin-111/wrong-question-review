@@ -1,4 +1,4 @@
-import { useEffect, useState, memo } from 'react';
+import { useEffect, useState, useMemo, memo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { Card, Form, Select, Input, Button, message, Row, Col, Typography, Radio, Checkbox, Space, Divider, Segmented } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
@@ -37,7 +37,7 @@ const EditorSegment = memo(({ value, onChange, placeholder }: {
         <div className="markdown-preview"
           style={{
             fontSize: 15, lineHeight: 1.8, padding: '12px 16px',
-            border: '1px solid rgba(60,60,67,0.10)', borderRadius: 8,
+            border: '1px solid var(--ink-alpha-10)', borderRadius: 8,
             minHeight: 300, maxHeight: 500, overflow: 'auto', background: '#fafafa',
           }}
           dangerouslySetInnerHTML={{ __html: renderMarkdown(value) }} />
@@ -57,7 +57,6 @@ export default function QuestionAddPage() {
   const [form] = Form.useForm();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [tags, setTags] = useState<TagType[]>([]);
-  const [questionTypes, setQuestionTypes] = useState<{ id: number; name: string }[]>([]);
   const [content, setContent] = useState('');
   const [explanation, setExplanation] = useState('');
   const [answerType, setAnswerType] = useState<string>('choice');
@@ -68,12 +67,19 @@ export default function QuestionAddPage() {
   const [loading, setLoading] = useState(false);
   const [drafts, setDrafts] = useState<{ id: number; content: string; updated_at: string }[]>([]);
 
-  const getAnswerTypeFromTypeName = (name: string): string | null => {
+  const getAnswerTypeFromTypeName = (name: string): 'choice' | 'fill' | 'subjective' | null => {
     if (/选择/.test(name)) return 'choice';
     if (/填空/.test(name)) return 'fill';
     if (/简答|问答|主观|论述/.test(name)) return 'subjective';
     return null;
   };
+
+  // 题型选项响应式派生：跟随学科变化自动更新，编辑/草稿回填无需手动触发加载
+  const subjectIdValue = Form.useWatch('subject_id', form);
+  const typeOptions = useMemo(() => {
+    const s = subjects.find((x) => x.id === subjectIdValue);
+    return (s?.question_types || []).map((t) => ({ label: t.name, value: t.id }));
+  }, [subjects, subjectIdValue]);
 
   useEffect(() => {
     draftApi.list().then(({ data }) => setDrafts(data.data || data || [])).catch(() => {});
@@ -84,7 +90,7 @@ export default function QuestionAddPage() {
       const { data } = await draftApi.get(draftId);
       const d = data.data || data;
       if (d.subject_id) form.setFieldValue('subject_id', d.subject_id);
-      if (d.question_type_id) { form.setFieldValue('question_type_id', d.question_type_id); handleSubjectChange(d.subject_id); }
+      if (d.question_type_id) form.setFieldValue('question_type_id', d.question_type_id);
       if (d.content) setContent(d.content);
       if (d.answer) {
         try {
@@ -146,8 +152,7 @@ export default function QuestionAddPage() {
       if (draftData.explanation) setExplanation(draftData.explanation);
       if (draftData.subject_id) {
         form.setFieldValue('subject_id', draftData.subject_id);
-        handleSubjectChange(draftData.subject_id);
-        setTimeout(() => form.setFieldValue('question_type_id', draftData.question_type_id), 100);
+        if (draftData.question_type_id) form.setFieldValue('question_type_id', draftData.question_type_id);
       }
       if (draftData.source) form.setFieldValue('source', draftData.source);
       if (draftData.tag_ids) form.setFieldValue('tag_ids', draftData.tag_ids);
@@ -186,12 +191,6 @@ export default function QuestionAddPage() {
       }).catch(() => message.error('加载题目失败'));
     }
   }, [editId]);
-
-  const handleSubjectChange = (subjectId: number) => {
-    const s = subjects.find((x) => x.id === subjectId);
-    setQuestionTypes(s?.question_types || []);
-    form.setFieldValue('question_type_id', undefined);
-  };
 
   const buildAnswer = (): string => {
     if (answerType === 'choice') {
@@ -278,7 +277,8 @@ export default function QuestionAddPage() {
               <Row gutter={16}>
                 <Col span={12}>
                   <Form.Item name="subject_id" label="学科" rules={[{ required: true, message: '请选择' }]}>
-                    <Select placeholder="选择学科" onChange={handleSubjectChange}
+                    <Select placeholder="选择学科"
+                      onChange={() => form.setFieldValue('question_type_id', undefined)}
                       options={subjects.map((s) => ({ label: s.name, value: s.id }))} />
                   </Form.Item>
                 </Col>
@@ -287,14 +287,15 @@ export default function QuestionAddPage() {
                     <Select placeholder="先选学科"
                       onChange={(id) => {
                         if (id) {
-                          const selected = questionTypes.find((t) => t.id === id);
+                          const all = subjects.flatMap((s) => s.question_types || []);
+                          const selected = all.find((t) => t.id === id);
                           if (selected) {
                             const autoType = getAnswerTypeFromTypeName(selected.name);
                             if (autoType) setAnswerType(autoType);
                           }
                         }
                       }}
-                      options={questionTypes.map((t) => ({ label: t.name, value: t.id }))} />
+                      options={typeOptions} />
                   </Form.Item>
                 </Col>
               </Row>
@@ -398,7 +399,7 @@ export default function QuestionAddPage() {
             {explanation && (
               <>
                 <Divider />
-                <Text strong style={{ fontSize: 13, color: '#007AFF' }}>解析</Text>
+                <Text strong style={{ fontSize: 13, color: 'var(--blue-ink)' }}>解析</Text>
                 <div className="markdown-preview"
                   style={{ fontSize: 14, lineHeight: 1.7, marginTop: 8 }}
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(explanation) }} />

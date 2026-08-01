@@ -71,10 +71,6 @@ export default function OCREntryPage() {
     return uploaded;
   };
 
-  const removeImage = (idx: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== idx));
-  };
-
   const handleCropDone = (crop: { x: number; y: number; width: number; height: number }, rotation: number) => {
     if (croppingIdx === null) return;
     const updated = [...images];
@@ -143,7 +139,7 @@ export default function OCREntryPage() {
           message.warning('AI 未能解析出题目');
           return;
         }
-        navigate('/questions/batch-edit', { state: { questions, raw_text: editedOcr } });
+        navigate('/questions/batch-edit', { state: { questions, raw_text: editedOcr, source: 'ocr' } });
       } else {
         const { data } = await ocrApi.parse({ ocr_text: editedOcr });
         setAiResult(data);
@@ -161,6 +157,7 @@ export default function OCREntryPage() {
         state: {
           questions: [{ question: editedOcr, answer: '', explanation: '', type: 'subjective' }],
           raw_text: editedOcr,
+          source: 'ocr',
         },
       });
     } else {
@@ -220,7 +217,7 @@ export default function OCREntryPage() {
               onChange={handleFileChange}
               style={{ padding: 40 }}
             >
-              <CameraOutlined style={{ fontSize: 48, color: '#007AFF', marginBottom: 16 }} />
+              <CameraOutlined style={{ fontSize: 48, color: 'var(--blue-ink)', marginBottom: 16 }} />
               <Text strong style={{ fontSize: 16, display: 'block' }}>点击或拖拽上传题目图片（支持多张）</Text>
               <Text className="text-secondary" style={{ display: 'block', marginTop: 4 }}>支持 jpg/png/bmp/webp，最大 10MB / 张</Text>
             </Upload.Dragger>
@@ -314,15 +311,15 @@ export default function OCREntryPage() {
                     onClick={() => setCroppingIdx(idx)}
                     style={{
                       width: 56, height: 56, borderRadius: 6, overflow: 'hidden', cursor: 'pointer',
-                      border: idx === croppingIdx ? '2px solid #007AFF' : '2px solid transparent',
+                      border: idx === croppingIdx ? '2px solid var(--blue-ink)' : '2px solid transparent',
                       opacity: img.cropped ? 0.5 : 1, flexShrink: 0, position: 'relative',
                     }}
                   >
                     <img src={img.url} alt="" style={{ width: 56, height: 56, objectFit: 'cover' }} />
                     {img.cropped && (
                       <CheckCircleFilled style={{
-                        position: 'absolute', top: -2, right: -2, color: '#34C759',
-                        fontSize: 16, background: '#fff', borderRadius: '50%',
+                        position: 'absolute', top: -2, right: -2, color: 'var(--red-pen)',
+                        fontSize: 16, background: 'var(--paper-card)', borderRadius: '50%',
                       }} />
                     )}
                   </div>
@@ -372,20 +369,20 @@ export default function OCREntryPage() {
                     border: '2px solid #e5e5e5', transition: 'border-color 0.2s',
                     position: 'relative',
                   }}
-                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = '#007AFF')}
-                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = img.cropped ? '#34C759' : '#e5e5e5')}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--blue-ink)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = img.cropped ? 'var(--red-pen)' : '#e5e5e5')}
                 >
                   <img src={img.url} alt="" style={{ width: 160, height: 120, objectFit: 'cover', display: 'block' }} />
                   <div style={{ padding: '8px 10px', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
                     {img.cropped ? (
                       <>
-                        <CheckCircleFilled style={{ color: '#34C759' }} />
-                        <Text style={{ color: '#34C759' }}>已框选</Text>
+                        <CheckCircleFilled style={{ color: 'var(--red-pen)' }} />
+                        <Text style={{ color: 'var(--red-pen)' }}>已框选</Text>
                       </>
                     ) : (
                       <>
-                        <ScanOutlined style={{ color: '#007AFF' }} />
-                        <Text style={{ color: '#007AFF' }}>点击框选</Text>
+                        <ScanOutlined style={{ color: 'var(--blue-ink)' }} />
+                        <Text style={{ color: 'var(--blue-ink)' }}>点击框选</Text>
                       </>
                     )}
                   </div>
@@ -500,9 +497,9 @@ export default function OCREntryPage() {
               { label: '解析', key: 'explanation', value: aiResult.explanation },
             ].map((item) => (
               <div key={item.key} style={{ marginBottom: 16 }}>
-                <Text strong style={{ color: '#007AFF' }}>{item.label}</Text>
+                <Text strong style={{ color: 'var(--blue-ink)' }}>{item.label}</Text>
                 <div style={{
-                  background: 'rgba(242,242,247,0.8)', padding: '12px 16px', borderRadius: 8, marginTop: 4,
+                  background: 'var(--paper-bg-80)', padding: '12px 16px', borderRadius: 8, marginTop: 4,
                   minHeight: 40, fontSize: 14, lineHeight: 1.8,
                 }}>
                   {item.value
@@ -525,7 +522,7 @@ export default function OCREntryPage() {
             <div style={{ textAlign: 'left', marginBottom: 12 }}>
               <Button type="text" icon={<ArrowLeftOutlined />} onClick={goBack}>返回上一步</Button>
             </div>
-            <CheckCircleOutlined style={{ fontSize: 48, color: '#34C759', marginBottom: 16 }} />
+            <CheckCircleOutlined style={{ fontSize: 48, color: 'var(--red-pen)', marginBottom: 16 }} />
             <Text strong style={{ fontSize: 16, display: 'block' }}>OCR 识别完成 {ocrElapsed > 0 && `(耗时 ${ocrElapsed}s)`}</Text>
             <Text className="text-secondary" style={{ display: 'block', marginTop: 4, marginBottom: 20 }}>
               识别结果将作为草稿保存，您可以在编辑页面中继续完善
@@ -536,7 +533,7 @@ export default function OCREntryPage() {
       </Card>
 
       <div style={{ textAlign: 'center', marginTop: 12 }}>
-        <Button type="text" onClick={() => navigate('/questions/add')} style={{ color: '#86868B' }}>
+        <Button type="text" onClick={() => navigate('/questions/add')} style={{ color: 'var(--ink-secondary)' }}>
           返回手动录入
         </Button>
       </div>

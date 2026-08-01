@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Typography, Button, Upload, Spin, message, Radio, Steps, Tag } from 'antd';
+import { Card, Typography, Button, Upload, Spin, message, Radio, Tag } from 'antd';
 import { FilePdfOutlined, LoadingOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { ocrApi } from '../api/ocr';
 
@@ -100,14 +100,14 @@ export default function PDFImportPage() {
                     key={label}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '10px 0', borderBottom: '1px solid rgba(60,60,67,0.06)',
+                      padding: '10px 0', borderBottom: '1px solid var(--ink-alpha-06)',
                       color: done ? '#333' : '#bbb',
                     }}
                   >
                     {done ? (
-                      <CheckCircleFilled style={{ color: '#34C759', fontSize: 18 }} />
+                      <CheckCircleFilled style={{ color: 'var(--red-pen)', fontSize: 18 }} />
                     ) : active ? (
-                      <LoadingOutlined style={{ color: '#007AFF', fontSize: 18 }} />
+                      <LoadingOutlined style={{ color: 'var(--blue-ink)', fontSize: 18 }} />
                     ) : (
                       <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #ddd' }} />
                     )}
@@ -130,7 +130,7 @@ export default function PDFImportPage() {
                   display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0',
                   borderTop: '2px solid #e5e5e5', marginTop: 4,
                 }}>
-                  <CheckCircleFilled style={{ color: '#007AFF', fontSize: 18 }} />
+                  <CheckCircleFilled style={{ color: 'var(--blue-ink)', fontSize: 18 }} />
                   <Text strong style={{ flex: 1 }}>全部完成</Text>
                   <Tag color="blue" style={{ fontSize: 13, fontFamily: 'monospace', fontWeight: 600 }}>
                     总耗时 {result.timing.total}s
@@ -147,7 +147,7 @@ export default function PDFImportPage() {
           </div>
         ) : result ? (
           <div style={{ padding: 40 }}>
-            <CheckCircleFilled style={{ fontSize: 48, color: '#34C759', marginBottom: 16 }} />
+            <CheckCircleFilled style={{ fontSize: 48, color: 'var(--red-pen)', marginBottom: 16 }} />
             <Text strong style={{ fontSize: 16, display: 'block' }}>处理完成</Text>
             <Text className="text-secondary" style={{ display: 'block', marginTop: 4 }}>
               {result.pageCount} 页 PDF → {result.questionCount} 道题目，总耗时 {result.timing.total}s
@@ -158,7 +158,7 @@ export default function PDFImportPage() {
           </div>
         ) : (
           <Upload.Dragger accept=".pdf" showUploadList={false} beforeUpload={handleUpload} style={{ padding: 30 }}>
-            <FilePdfOutlined style={{ fontSize: 48, color: '#FF3B30', marginBottom: 12 }} />
+            <FilePdfOutlined style={{ fontSize: 48, color: 'var(--red-pen-deep)', marginBottom: 12 }} />
             <Text strong style={{ fontSize: 16, display: 'block' }}>
               点击或拖拽上传 PDF
             </Text>
@@ -188,7 +188,7 @@ export default function PDFImportPage() {
       </Card>
 
       <div style={{ textAlign: 'center', marginTop: 12 }}>
-        <Button type="text" onClick={() => navigate('/questions/add')} style={{ color: '#86868B' }}>
+        <Button type="text" onClick={() => navigate('/questions/add')} style={{ color: 'var(--ink-secondary)' }}>
           返回手动录入
         </Button>
       </div>

@@ -38,21 +38,22 @@ export default function RegisterPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#F2F2F7',
+        background: 'transparent',
         padding: 24,
       }}
     >
       <div
         style={{
           width: 420,
-          background: '#FFFFFF',
-          borderRadius: 16,
+          background: 'var(--paper-card)',
+          border: '1px solid var(--ink-alpha-10)',
+          borderRadius: 12,
           padding: '40px 36px',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)',
+          boxShadow: 'var(--shadow-card)',
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <Title level={3} style={{ fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>
+          <Title level={3} className="font-kai" style={{ fontWeight: 700, letterSpacing: '0.04em', marginBottom: 4 }}>
             创建账户
           </Title>
           <Text className="text-secondary">开始管理你的错题</Text>
@@ -67,7 +68,7 @@ export default function RegisterPage() {
             ]}
           >
             <Input
-              prefix={<UserOutlined style={{ color: '#86868B' }} />}
+              prefix={<UserOutlined style={{ color: 'var(--ink-secondary)' }} />}
               placeholder="用户名"
             />
           </Form.Item>
@@ -80,7 +81,7 @@ export default function RegisterPage() {
             ]}
           >
             <Input
-              prefix={<MailOutlined style={{ color: '#86868B' }} />}
+              prefix={<MailOutlined style={{ color: 'var(--ink-secondary)' }} />}
               placeholder="邮箱"
             />
           </Form.Item>
@@ -93,7 +94,7 @@ export default function RegisterPage() {
             ]}
           >
             <Input.Password
-              prefix={<LockOutlined style={{ color: '#86868B' }} />}
+              prefix={<LockOutlined style={{ color: 'var(--ink-secondary)' }} />}
               placeholder="密码"
             />
           </Form.Item>
@@ -114,7 +115,7 @@ export default function RegisterPage() {
             ]}
           >
             <Input.Password
-              prefix={<LockOutlined style={{ color: '#86868B' }} />}
+              prefix={<LockOutlined style={{ color: 'var(--ink-secondary)' }} />}
               placeholder="确认密码"
             />
           </Form.Item>

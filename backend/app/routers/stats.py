@@ -1,4 +1,4 @@
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, cast, Date, Integer
@@ -10,7 +10,9 @@ from app.models.user import User
 from app.models.question import Question
 from app.models.review_record import ReviewRecord
 from app.models.subject import Subject
-from app.services.review_service import get_today_pending
+from app.models.fsrs_state import FsrsState
+from app.services.review_service import get_today_pending, _get_due_question_ids
+from app.services.fsrs import compute_retrievability
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -169,6 +171,18 @@ def subjects_breakdown(db: Session = Depends(get_db), current_user: User = Depen
             "accuracy": round((correct / attempts * 100), 2) if attempts > 0 else 0,
         }
 
+    # Per-subject due count（与今日待复习同一口径）
+    due_ids = _get_due_question_ids(db, current_user.id)
+    pending_map: dict[int, int] = {}
+    if due_ids:
+        pending_rows = (
+            db.query(Question.subject_id, func.count(Question.id))
+            .filter(Question.id.in_(due_ids))
+            .group_by(Question.subject_id)
+            .all()
+        )
+        pending_map = {sid: cnt for sid, cnt in pending_rows}
+
     results = []
     for s in subjects:
         st = stats_map.get(s.id, {"attempts": 0, "accuracy": 0})
@@ -179,7 +193,46 @@ def subjects_breakdown(db: Session = Depends(get_db), current_user: User = Depen
             "total": total_map.get(s.id, 0),
             "attempts": st["attempts"],
             "accuracy": st["accuracy"],
-            "pending": 0,
+            "pending": pending_map.get(s.id, 0),
+        })
+    return results
+
+
+@router.get("/subject-retrievability")
+def subject_retrievability(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """各学科 FSRS 记忆保留度（当前还记得多少），仅统计已进入 FSRS 复习的题目。"""
+    subjects = db.query(Subject).filter(Subject.user_id == current_user.id).all()
+    if not subjects:
+        return []
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    results = []
+    for s in subjects:
+        total = (
+            db.query(func.count(Question.id))
+            .filter(Question.subject_id == s.id, Question.is_deleted == False)
+            .scalar()
+        ) or 0
+        rows = (
+            db.query(FsrsState.stability, FsrsState.last_review_at)
+            .join(Question, Question.id == FsrsState.question_id)
+            .filter(Question.subject_id == s.id, Question.is_deleted == False, FsrsState.last_review_at.isnot(None))
+            .all()
+        )
+        avg = 0.0
+        if rows:
+            total_r = 0.0
+            for stability, last_review_at in rows:
+                elapsed = max((now - last_review_at).total_seconds() / 86400.0, 0.0)
+                total_r += compute_retrievability(elapsed, stability)
+            avg = round(total_r / len(rows), 4)
+        results.append({
+            "subject_id": s.id,
+            "name": s.name,
+            "color": s.color,
+            "retrievability": avg,
+            "reviewed": len(rows),
+            "total": total,
         })
     return results
 

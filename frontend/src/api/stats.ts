@@ -5,5 +5,6 @@ export const statsApi = {
   overview: () => client.get('/stats/overview'),
   trends: (days: number = 7) => client.get('/stats/trends', { params: { days } }),
   subjectsBreakdown: () => client.get('/stats/subjects-breakdown'),
+  subjectRetrievability: () => client.get('/stats/subject-retrievability'),
   streak: () => client.get('/stats/streak'),
 };

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Typography, Select, InputNumber, Button, Space, message, Tag } from 'antd';
+import { Card, Typography, Select, InputNumber, Button, Space, message, Tag, Pagination } from 'antd';
 import {
   PlayCircleOutlined, HistoryOutlined, RightCircleOutlined, StopOutlined,
   CheckSquareOutlined, ThunderboltOutlined, ClockCircleOutlined,
@@ -38,17 +38,22 @@ export default function ReviewCenterPage() {
   const [limit, setLimit] = useState<number | null>(20);
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
+  const [sessionsTotal, setSessionsTotal] = useState(0);
+  const [sessionPage, setSessionPage] = useState(1);
   const [resuming, setResuming] = useState<number | null>(null);
 
   useEffect(() => {
     subjectsApi.list().then(({ data }) => setSubjects(data)).catch(() => {});
     tagsApi.list().then(({ data }) => setTags(data)).catch(() => {});
-    fetchSessions();
   }, []);
 
-  const fetchSessions = () => {
-    reviewApi.listSessions().then(({ data }) => {
-      setSessions((data.data || data) || []);
+  useEffect(() => { fetchSessions(sessionPage); }, [sessionPage]);
+
+  const fetchSessions = (page = 1) => {
+    reviewApi.listSessions({ page, page_size: 6 }).then(({ data }) => {
+      const d = (data as any).data || data;
+      setSessions(d.items || []);
+      setSessionsTotal(d.total || 0);
     }).catch(() => {});
   };
 
@@ -107,27 +112,27 @@ export default function ReviewCenterPage() {
   const modeCards = [
     {
       key: 'select' as ActiveMode,
-      icon: <CheckSquareOutlined style={{ fontSize: 28, color: '#5856D6' }} />,
+      icon: <CheckSquareOutlined style={{ fontSize: 28, color: '#6B5BA5' }} />,
       title: '选题重做',
       desc: '手动勾选题目，精准挑选需要重做的错题',
-      color: '#5856D6',
-      bg: 'rgba(88,86,214,0.04)',
+      color: '#6B5BA5',
+      bg: 'var(--purple-05)',
     },
     {
       key: 'free' as ActiveMode,
-      icon: <ThunderboltOutlined style={{ fontSize: 28, color: '#007AFF' }} />,
+      icon: <ThunderboltOutlined style={{ fontSize: 28, color: 'var(--blue-ink)' }} />,
       title: '自由模式',
       desc: '按学科和标签筛选，随机或按顺序练习',
-      color: '#007AFF',
-      bg: 'rgba(0,122,255,0.04)',
+      color: 'var(--blue-ink)',
+      bg: 'var(--blue-ink-04)',
     },
     {
       key: 'spaced' as ActiveMode,
-      icon: <ClockCircleOutlined style={{ fontSize: 28, color: '#FF9500' }} />,
+      icon: <ClockCircleOutlined style={{ fontSize: 28, color: 'var(--amber)' }} />,
       title: '遗忘曲线模式',
       desc: 'FSRS 智能调度算法，根据每次答题表现动态调整复习间隔',
-      color: '#FF9500',
-      bg: 'rgba(255,149,0,0.04)',
+      color: 'var(--amber)',
+      bg: 'var(--amber-06)',
     },
   ];
 
@@ -156,17 +161,17 @@ export default function ReviewCenterPage() {
                 }}
                 className="card-elevated"
                 style={{
-                  borderRadius: 14,
+                  borderRadius: 10,
                   cursor: m.key === 'select' ? 'pointer' : 'pointer',
-                  border: isActive ? `2px solid ${m.color}` : '1px solid rgba(60,60,67,0.08)',
-                  background: isActive ? m.bg : '#fff',
+                  border: isActive ? `2px solid ${m.color}` : '1px solid var(--ink-alpha-08)',
+                  background: isActive ? m.bg : 'var(--paper-card)',
                   transition: 'all 0.2s',
                 }}
                 bodyStyle={{ padding: '16px 20px' }}
               >
                 <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
                   <div style={{
-                    width: 52, height: 52, borderRadius: 14,
+                    width: 52, height: 52, borderRadius: 10,
                     background: m.bg,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     flexShrink: 0,
@@ -174,7 +179,7 @@ export default function ReviewCenterPage() {
                     {m.icon}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <Text strong style={{ fontSize: 16, color: '#1D1D1F', display: 'block' }}>
+                    <Text strong style={{ fontSize: 16, color: 'var(--ink)', display: 'block' }}>
                       {m.title}
                       {isActive && <span style={{ fontSize: 12, color: m.color, marginLeft: 8, fontWeight: 400 }}>已选择</span>}
                     </Text>
@@ -182,7 +187,7 @@ export default function ReviewCenterPage() {
                   </div>
                   {m.key !== 'select' && (
                     <RightCircleOutlined style={{
-                      color: isActive ? m.color : '#C7C7CC',
+                      color: isActive ? m.color : 'var(--ink-tertiary)',
                       fontSize: 18,
                       transform: isActive ? 'rotate(90deg)' : 'none',
                       transition: 'all 0.2s',
@@ -197,7 +202,7 @@ export default function ReviewCenterPage() {
         {/* Config form — shown when free or spaced mode is active */}
         {activeMode && activeMode !== 'select' && (
           <>
-            <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+            <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
               <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 14 }}>选择题库</Text>
               <div style={{ marginBottom: 14 }}>
                 <Text className="text-secondary" style={{ fontSize: 13, display: 'block', marginBottom: 6 }}>学科（必选）</Text>
@@ -213,7 +218,7 @@ export default function ReviewCenterPage() {
               </div>
             </Card>
 
-            <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
+            <Card className="card-elevated" style={{ borderRadius: 10, marginBottom: 16 }}>
               <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 14 }}>练习设置</Text>
 
               {activeMode === 'free' && (
@@ -250,9 +255,9 @@ export default function ReviewCenterPage() {
               loading={loading}
               onClick={() => startReview(activeMode)}
               style={{
-                height: 48, fontSize: 16, borderRadius: 12, fontWeight: 600,
-                background: activeMode === 'spaced' ? '#FF9500' : '#007AFF',
-                borderColor: activeMode === 'spaced' ? '#FF9500' : '#007AFF',
+                height: 48, fontSize: 16, borderRadius: 10, fontWeight: 600,
+                background: activeMode === 'spaced' ? 'var(--amber)' : 'var(--blue-ink)',
+                borderColor: activeMode === 'spaced' ? 'var(--amber)' : 'var(--blue-ink)',
               }}
             >
               {activeMode === 'spaced' ? '开始遗忘曲线复习' : '开始自由重做'}
@@ -264,18 +269,18 @@ export default function ReviewCenterPage() {
       {/* Right — session history */}
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <HistoryOutlined style={{ color: '#86868B' }} />
+          <HistoryOutlined style={{ color: 'var(--ink-secondary)' }} />
           <Text strong style={{ fontSize: 15 }}>练习记录</Text>
         </div>
 
         {sessions.length === 0 ? (
-          <Card className="card-elevated" style={{ borderRadius: 14, textAlign: 'center', padding: 32 }}>
+          <Card className="card-elevated" style={{ borderRadius: 10, textAlign: 'center', padding: 32 }}>
             <Text className="text-tertiary" style={{ fontSize: 13 }}>暂无练习记录</Text>
           </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 'calc(100vh - 160px)', overflow: 'auto' }}>
             {sessions.map((s) => (
-              <Card key={s.id} className="card-elevated" style={{ borderRadius: 12 }}
+              <Card key={s.id} className="card-elevated" style={{ borderRadius: 10 }}
                 bodyStyle={{ padding: '12px 14px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
                   <div>
@@ -305,7 +310,7 @@ export default function ReviewCenterPage() {
                     {s.is_finished ? (
                       <Button type="text" size="small"
                         onClick={() => navigate('/review/result', { state: { session_id: s.id } })}
-                        style={{ color: '#007AFF', fontSize: 12, padding: '0 4px' }}>
+                        style={{ color: 'var(--blue-ink)', fontSize: 12, padding: '0 4px' }}>
                         查看结果
                       </Button>
                     ) : (
@@ -330,6 +335,17 @@ export default function ReviewCenterPage() {
                 </div>
               </Card>
             ))}
+          </div>
+        )}
+        {sessionsTotal > 6 && (
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+            <Pagination
+              current={sessionPage}
+              total={sessionsTotal}
+              pageSize={6}
+              onChange={setSessionPage}
+              showTotal={(t) => `共 ${t} 条`}
+            />
           </div>
         )}
       </div>

@@ -79,7 +79,7 @@ export function renderMarkdown(text: string): string {
   // Step 5-7: Restore placeholders
   const restore = (marker: string, blocks: string[]) => {
     const pattern = new RegExp(marker + '(\\d+)', 'g');
-    html = html.replace(pattern, (_, idx) => blocks[parseInt(idx)] || '');
+    html = html.replace(pattern, (_: string, idx: string) => blocks[parseInt(idx)] || '');
   };
   restore(M_MATH, displayBlocks);
   restore(M_INLINE, inlineBlocks);

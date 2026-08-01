@@ -1,10 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Table, Input, Select, Button, Space, Popconfirm, message, Tag, Typography } from 'antd';
-import { PlusOutlined, SearchOutlined, DeleteOutlined, EyeOutlined, EditOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Card, Table, Input, Select, Button, Space, Popconfirm, message, Tag, Typography, Segmented, Pagination } from 'antd';
+import { PlusOutlined, DeleteOutlined, EyeOutlined, EditOutlined, DownloadOutlined, TableOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { Dropdown } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { MenuProps } from 'antd';
+import QuestionCardGrid from '../components/question/QuestionCardGrid';
 import { questionsApi } from '../api/questions';
 import { subjectsApi } from '../api/subjects';
 import { tagsApi } from '../api/tags';
@@ -41,13 +42,16 @@ export default function QuestionsPage() {
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const [view, setView] = useState<'table' | 'card'>(() => localStorage.getItem('questions_view') === 'card' ? 'card' : 'table');
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleKeywordChange = (value: string) => {
     setKeyword(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => setDebouncedKeyword(value), 400);
   };
+
+  const pageSize = view === 'card' ? 9 : 10;
 
   const fetchData = async () => {
     setLoading(true);
@@ -56,7 +60,7 @@ export default function QuestionsPage() {
         ...filters,
         keyword: debouncedKeyword || undefined,
         page,
-        page_size: 10,
+        page_size: pageSize,
       });
       setData(res.items || []);
       setTotal(res.total || 0);
@@ -64,12 +68,28 @@ export default function QuestionsPage() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchData(); }, [page, filters, debouncedKeyword]);
+  useEffect(() => { fetchData(); }, [page, filters, debouncedKeyword, view]);
 
   useEffect(() => {
     subjectsApi.list().then(({ data }) => setSubjects(data)).catch(() => {});
     tagsApi.list().then(({ data }) => setTags(data)).catch(() => {});
   }, []);
+
+  // 按题型名合并：同名题型（各学科各一个）归为一类，value 为逗号分隔的 type_id 列表
+  const typeOptions = useMemo(() => {
+    const map = new Map<string, number[]>();
+    subjects.forEach((s) =>
+      (s.question_types || []).forEach((t) => {
+        const ids = map.get(t.name) || [];
+        ids.push(t.id);
+        map.set(t.name, ids);
+      }),
+    );
+    return Array.from(map.entries()).map(([name, ids]) => ({
+      label: name,
+      value: ids.join(','),
+    }));
+  }, [subjects]);
 
   const handleDelete = async (id: number) => {
     await questionsApi.delete(id);
@@ -164,7 +184,21 @@ export default function QuestionsPage() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Text style={{ fontWeight: 600, fontSize: 20, letterSpacing: '-0.02em' }}>错题库</Text>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/questions/add')}>添加错题</Button>
+        <Space>
+          <Segmented
+            value={view}
+            onChange={(v) => {
+              setView(v as 'table' | 'card');
+              setPage(1);
+              localStorage.setItem('questions_view', v as string);
+            }}
+            options={[
+              { label: '表格', value: 'table', icon: <TableOutlined /> },
+              { label: '卡片', value: 'card', icon: <AppstoreOutlined /> },
+            ]}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/questions/add')}>添加错题</Button>
+        </Space>
       </div>
 
       <Card className="card-elevated" style={{ borderRadius: 14, marginBottom: 16 }}>
@@ -181,6 +215,11 @@ export default function QuestionsPage() {
             placeholder="学科" allowClear style={{ width: 120 }}
             onChange={(v) => setFilters({ ...filters, subject_id: v })}
             options={subjects.map((s) => ({ label: s.name, value: String(s.id) }))}
+          />
+          <Select
+            placeholder="题型" allowClear style={{ width: 130 }}
+            onChange={(v) => setFilters({ ...filters, type_id: v })}
+            options={typeOptions}
           />
           <Select
             placeholder="标签" allowClear style={{ width: 120 }}
@@ -206,21 +245,38 @@ export default function QuestionsPage() {
         </Space>
       </Card>
 
-      <Card className="card-elevated" style={{ borderRadius: 14 }}>
-        <Table
-          rowKey="id"
-          columns={columns}
-          dataSource={data}
-          loading={loading}
-          rowSelection={{ selectedRowKeys: selectedIds, onChange: (keys) => setSelectedIds(keys as number[]) }}
-          pagination={{
-            current: page, total, pageSize: 10, showTotal: (t) => `共 ${t} 题`,
-            onChange: (p) => setPage(p),
-          }}
-          size="middle"
-          locale={{ emptyText: '还没有错题，点击上方"添加错题"开始' }}
-        />
-      </Card>
+      {view === 'card' ? (
+        <>
+          <QuestionCardGrid
+            items={data}
+            selectedIds={selectedIds}
+            loading={loading}
+            onToggleSelect={(id) => setSelectedIds((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id])}
+            onView={(id) => navigate(`/questions/${id}`)}
+            onEdit={(id) => navigate(`/questions/add?edit=${id}`)}
+            onDelete={handleDelete}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+            <Pagination current={page} total={total} pageSize={pageSize} showTotal={(t) => `共 ${t} 题`} onChange={(p) => setPage(p)} />
+          </div>
+        </>
+      ) : (
+        <Card className="card-elevated" style={{ borderRadius: 14 }}>
+          <Table
+            rowKey="id"
+            columns={columns}
+            dataSource={data}
+            loading={loading}
+            rowSelection={{ selectedRowKeys: selectedIds, onChange: (keys) => setSelectedIds(keys as number[]) }}
+            pagination={{
+              current: page, total, pageSize: pageSize, showTotal: (t) => `共 ${t} 题`,
+              onChange: (p) => setPage(p),
+            }}
+            size="middle"
+            locale={{ emptyText: '还没有错题，点击上方"添加错题"开始' }}
+          />
+        </Card>
+      )}
     </div>
   );
 }

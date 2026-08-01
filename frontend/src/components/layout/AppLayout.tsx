@@ -1,4 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { Layout, Menu, Avatar, Dropdown, type MenuProps } from 'antd';
 import {
   HomeOutlined,
@@ -12,6 +13,8 @@ import {
   RobotOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../store/AuthContext';
+import { Game24Provider } from '../game24/Game24Provider';
+import Game24FloatingButton from '../game24/Game24FloatingButton';
 
 const { Header, Sider, Content } = Layout;
 
@@ -51,7 +54,8 @@ export default function AppLayout() {
   };
 
   return (
-    <Layout style={{ height: '100vh' }}>
+    <Game24Provider>
+      <Layout style={{ height: '100vh' }}>
       <Header
         className="glass"
         style={{
@@ -65,23 +69,29 @@ export default function AppLayout() {
           zIndex: 100,
         }}
       >
-        <span
-          style={{
-            fontSize: 18,
-            fontWeight: 700,
-            color: '#1D1D1F',
-            letterSpacing: '-0.02em',
-            cursor: 'pointer',
-          }}
-          onClick={() => navigate('/')}
-        >
-          错题集
-        </span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <span
+            className="font-kai"
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              color: 'var(--ink)',
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+            }}
+            onClick={() => navigate('/')}
+          >
+            ✎ 错题本
+          </span>
+          <span className="font-mono text-tertiary" style={{ fontSize: 12 }}>
+            {dayjs().format('YYYY.MM.DD')}
+          </span>
+        </div>
 
         <Dropdown menu={{ items: userMenuItems, onClick: handleUserMenu }} placement="bottomRight">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <Avatar size={32} src={state.user?.avatar_url} icon={<UserOutlined />} style={{ backgroundColor: '#007AFF' }} />
-            <span style={{ fontSize: 14, fontWeight: 500, color: '#1D1D1F' }}>
+            <Avatar size={32} src={state.user?.avatar_url} icon={<UserOutlined />} style={{ backgroundColor: 'var(--blue-ink)' }} />
+            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
               {state.user?.username}
             </span>
           </div>
@@ -92,8 +102,8 @@ export default function AppLayout() {
         <Sider
           width={200}
           style={{
-            background: 'rgba(242,242,247,0.6)',
-            borderRight: '1px solid rgba(60,60,67,0.06)',
+            background: 'transparent',
+            borderRight: '1px solid var(--ink-alpha-08)',
           }}
         >
           <Menu
@@ -105,12 +115,14 @@ export default function AppLayout() {
           />
         </Sider>
 
-        <Content style={{ padding: 24, overflow: 'auto', background: '#F2F2F7' }}>
+        <Content style={{ padding: 24, overflow: 'auto', background: 'transparent' }}>
           <div className="page-enter-active">
             <Outlet />
           </div>
         </Content>
       </Layout>
-    </Layout>
+      </Layout>
+      <Game24FloatingButton />
+    </Game24Provider>
   );
 }

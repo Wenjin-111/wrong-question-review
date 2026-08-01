@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Button, Space } from 'antd';
 import { RotateLeftOutlined, RotateRightOutlined } from '@ant-design/icons';
 
@@ -88,7 +88,7 @@ export default function ImageCropper({ src, onCrop, onSkip }: Props) {
         onMouseUp={handleMouseUp}
         style={{
           position: 'relative', display: 'inline-block', maxWidth: '100%',
-          border: '1px solid rgba(60,60,67,0.1)', borderRadius: 10, overflow: 'hidden',
+          border: '1px solid var(--ink-alpha-10)', borderRadius: 10, overflow: 'hidden',
           cursor: 'crosshair', userSelect: 'none',
         }}
       >
@@ -108,7 +108,7 @@ export default function ImageCropper({ src, onCrop, onSkip }: Props) {
             style={{
               position: 'absolute', left: crop.x, top: crop.y,
               width: crop.width, height: crop.height,
-              border: '2px solid #007AFF', background: 'rgba(0,122,255,0.1)',
+              border: '2px solid var(--blue-ink)', background: 'var(--blue-ink-10)',
               pointerEvents: dragging ? 'none' : 'auto',
               borderRadius: 2,
             }}
@@ -118,7 +118,7 @@ export default function ImageCropper({ src, onCrop, onSkip }: Props) {
                 key={corner}
                 onMouseDown={(e) => { e.stopPropagation(); setDragCorner(corner); setDragging(true); }}
                 style={{
-                  position: 'absolute', width: 10, height: 10, background: '#007AFF', borderRadius: 5,
+                  position: 'absolute', width: 10, height: 10, background: 'var(--blue-ink)', borderRadius: 5,
                   ...(corner.includes('n') ? { top: -5 } : { bottom: -5 }),
                   ...(corner.includes('w') ? { left: -5 } : { right: -5 }),
                   cursor: `${corner}-resize`,
@@ -133,7 +133,7 @@ export default function ImageCropper({ src, onCrop, onSkip }: Props) {
           <Button type="primary" onClick={confirmCrop}>确认框选，开始识别</Button>
         </div>
       )}
-      <div style={{ marginTop: 8, color: '#86868B', fontSize: 13 }}>
+      <div style={{ marginTop: 8, color: 'var(--ink-secondary)', fontSize: 13 }}>
         拖拽鼠标框选题目区域，拖拽四角可调整选区大小
       </div>
     </div>

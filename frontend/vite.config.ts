@@ -19,11 +19,11 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom', 'react-router-dom'],
-          antd: ['antd', '@ant-design/icons'],
-          editor: ['@tiptap/react', '@tiptap/starter-kit'],
-          charts: ['recharts'],
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor';
+          if (id.includes('antd') || id.includes('@ant-design')) return 'antd';
+          if (id.includes('tiptap')) return 'editor';
         },
       },
     },

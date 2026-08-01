@@ -46,11 +46,11 @@ export default function DashboardPage() {
     return (
       <div>
         <Skeleton active paragraph={{ rows: 1 }} title style={{ marginBottom: 24, width: 300 }} />
-        <Skeleton.Input active size="large" block style={{ height: 100, marginBottom: 16, borderRadius: 14 }} />
+        <Skeleton.Input active size="large" block style={{ height: 100, marginBottom: 16, borderRadius: 10 }} />
         <Row gutter={[16, 16]}>
           {[1, 2, 3, 4].map((i) => (
             <Col xs={12} sm={6} key={i}>
-              <Skeleton.Input active block style={{ height: 100, borderRadius: 14 }} />
+              <Skeleton.Input active block style={{ height: 100, borderRadius: 10 }} />
             </Col>
           ))}
         </Row>
@@ -74,17 +74,17 @@ export default function DashboardPage() {
       <Card
         className="card-elevated"
         style={{
-          borderRadius: 14, marginBottom: 16,
+          borderRadius: 10, marginBottom: 16,
           background: st.today_reviewed
-            ? 'rgba(52,199,89,0.04)'
+            ? 'var(--red-pen-04)'
             : (d.today_pending || 0) > 0
-              ? 'rgba(255,149,0,0.06)'
-              : 'rgba(242,242,247,0.4)',
+              ? 'var(--amber-07)'
+              : 'var(--paper-deep-50)',
           border: st.today_reviewed
-            ? '1px solid rgba(52,199,89,0.15)'
+            ? '1px solid var(--red-pen-18)'
             : (d.today_pending || 0) > 0
-              ? '1px solid rgba(255,149,0,0.2)'
-              : '1px solid rgba(60,60,67,0.06)',
+              ? '1px solid var(--amber-22)'
+              : '1px solid var(--ink-alpha-06)',
         }}
         bodyStyle={{ padding: '18px 24px' }}
       >
@@ -92,8 +92,8 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', gap: 32, alignItems: 'center', flexWrap: 'wrap' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <FireOutlined style={{ color: st.current_streak > 0 ? '#FF9500' : '#C7C7CC', fontSize: 18 }} />
-                <Text strong style={{ fontSize: 22, color: st.current_streak > 0 ? '#FF9500' : '#86868B' }}>
+                <FireOutlined style={{ color: st.current_streak > 0 ? 'var(--amber)' : 'var(--ink-tertiary)', fontSize: 18 }} />
+                <Text strong style={{ fontSize: 22, color: st.current_streak > 0 ? 'var(--amber)' : 'var(--ink-secondary)' }}>
                   {st.current_streak || 0}
                 </Text>
                 <Text className="text-secondary" style={{ fontSize: 14 }}>天连续打卡</Text>
@@ -108,11 +108,11 @@ export default function DashboardPage() {
                 <Tag color="success" style={{ fontSize: 13, padding: '4px 12px', borderRadius: 8 }}>今日已打卡 ✓</Tag>
               ) : (d.today_pending || 0) > 0 ? (
                 <div>
-                  <Text style={{ fontSize: 15, color: '#FF9500', fontWeight: 500 }}>
+                  <Text style={{ fontSize: 15, color: 'var(--amber)', fontWeight: 500 }}>
                     今日待复习 {d.today_pending} 题
                   </Text>
                   <Button type="primary" size="small" onClick={() => navigate('/review')}
-                    style={{ marginLeft: 12, borderRadius: 8, background: '#FF9500', borderColor: '#FF9500' }}>
+                    style={{ marginLeft: 12, borderRadius: 8, background: 'var(--amber)', borderColor: 'var(--amber)' }}>
                     去复习
                   </Button>
                 </div>
@@ -145,9 +145,9 @@ export default function DashboardPage() {
                   background: d.reviewed
                     ? (() => {
                         const count = recentDates.filter((x: any) => x.reviewed).length;
-                        return count > 30 ? '#34C759' : '#AF52DE';
+                        return count > 30 ? 'var(--red-pen)' : '#6B5BA5';
                       })()
-                    : 'rgba(60,60,67,0.06)',
+                    : 'var(--ink-alpha-06)',
                 }} />
               </Tooltip>
             ))}
@@ -158,13 +158,13 @@ export default function DashboardPage() {
       {/* Stat cards */}
       <Row gutter={[16, 16]}>
         {[
-          { label: '错题总数', value: d.total_questions ?? '--', color: '#007AFF', icon: <CalendarOutlined /> },
-          { label: '总体正确率', value: d.accuracy != null ? `${d.accuracy}%` : '--', color: '#34C759', icon: <TrophyOutlined /> },
-          { label: '总作答次数', value: d.total_attempts ?? '--', color: '#AF52DE', icon: <FireOutlined /> },
-          { label: '累计打卡', value: `${st.total_days || 0} 天`, color: '#FF9500', icon: <FireOutlined /> },
+          { label: '错题总数', value: d.total_questions ?? '--', color: 'var(--blue-ink)', icon: <CalendarOutlined /> },
+          { label: '总体正确率', value: d.accuracy != null ? `${d.accuracy}%` : '--', color: 'var(--red-pen)', icon: <TrophyOutlined /> },
+          { label: '总作答次数', value: d.total_attempts ?? '--', color: '#6B5BA5', icon: <FireOutlined /> },
+          { label: '累计打卡', value: `${st.total_days || 0} 天`, color: 'var(--amber)', icon: <FireOutlined /> },
         ].map((s) => (
           <Col xs={12} sm={6} key={s.label}>
-            <div className="card-elevated" style={{ padding: '20px 24px', borderRadius: 14 }}>
+            <div className="card-elevated" style={{ padding: '20px 24px', borderRadius: 10 }}>
               <Text className="text-secondary" style={{ fontSize: 13 }}>{s.label}</Text>
               <div style={{ fontSize: 32, fontWeight: 700, color: s.color, letterSpacing: '-0.02em', marginTop: 4 }}>
                 {s.value}
@@ -176,7 +176,7 @@ export default function DashboardPage() {
 
       <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
         <Col xs={24} md={12}>
-          <Card className="card-elevated" style={{ borderRadius: 14 }} title={<Text strong>学科分布</Text>}>
+          <Card className="card-elevated" style={{ borderRadius: 10 }} title={<Text strong>学科分布</Text>}>
             {(d.subject_distribution || []).length === 0 ? (
               <Text className="text-tertiary">暂无数据</Text>
             ) : (
@@ -190,12 +190,12 @@ export default function DashboardPage() {
           </Card>
         </Col>
         <Col xs={24} md={12}>
-          <Card className="card-elevated" style={{ borderRadius: 14 }} title={<Text strong>最近添加</Text>}>
+          <Card className="card-elevated" style={{ borderRadius: 10 }} title={<Text strong>最近添加</Text>}>
             {(d.recent_questions || []).length === 0 ? (
               <Text className="text-tertiary">还没有错题</Text>
             ) : (
               (d.recent_questions || []).map((q: any) => (
-                <div key={q.id} style={{ cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid rgba(60,60,67,0.04)' }}
+                <div key={q.id} style={{ cursor: 'pointer', padding: '6px 0', borderBottom: '1px solid var(--ink-alpha-04)' }}
                   onClick={() => navigate(`/questions/${q.id}`)}>
                   <div className="markdown-body" style={{ fontSize: 13, lineHeight: 1.4, maxHeight: 80, overflow: 'hidden' }}
                     dangerouslySetInnerHTML={{ __html: renderMarkdown(q.content || '') }} />

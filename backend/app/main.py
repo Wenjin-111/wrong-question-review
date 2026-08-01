@@ -5,14 +5,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from loguru import logger
 
 from app.config import settings
 from app.routers import auth, subjects, tags, questions, ocr, draft, review, ai_chat, stats, export, notes, settings as settings_router
 from app.services.ai_service import close_ai_client
+from app.utils.rate_limit import limiter
 
 # Logging
 os.makedirs("logs", exist_ok=True)
@@ -29,8 +29,6 @@ logger.add(
 )
 
 # Rate limiting
-limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
-
 app = FastAPI(title="错题收集与重做系统", version="1.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -71,10 +69,11 @@ async def shutdown():
 
 @app.get("/api/health")
 def health():
+    from sqlalchemy import text
     from app.database import SessionLocal
     try:
         db = SessionLocal()
-        db.execute(db.bind.dialect.do_ping(None))
+        db.execute(text("SELECT 1"))
         db.close()
         return {"status": "ok", "database": "connected"}
     except Exception:
