@@ -31,6 +31,3 @@ backend/logs/
 
 # Claude settings
 .claude/
-
-# Screenshots (dev only)
-screenshots/
