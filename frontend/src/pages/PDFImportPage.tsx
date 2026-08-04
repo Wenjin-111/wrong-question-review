@@ -7,19 +7,26 @@ import { ocrApi } from '../api/ocr';
 const { Title, Text } = Typography;
 
 interface Timing {
-  pdf_to_images: number;
-  ocr_per_page: number[];
+  pdf_to_images?: number;
+  ocr_per_page?: number[];
+  mineru?: number;
   ai_parse: number;
   total: number;
 }
 
-const stepLabels = ['渲染 PDF 为图片', '逐页 OCR 识别', 'AI 题目解析'] as const;
+const stepLabels: Record<string, readonly string[]> = {
+  hunyuan: ['渲染 PDF 为图片', '逐页 OCR 识别', 'AI 题目解析'],
+  mineru: ['上传 PDF 到 MinerU', '在线解析提取 Markdown', 'AI 题目解析'],
+};
 
 export default function PDFImportPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [engine, setEngine] = useState(() => localStorage.getItem('ocr_engine') || 'hunyuan');
-  const [result, setResult] = useState<{ timing: Timing; pageCount: number; questionCount: number; questions: any[]; rawText: string } | null>(null);
+  const [engine, setEngine] = useState(() => {
+    const saved = localStorage.getItem('ocr_engine');
+    return saved === 'paddle' ? 'hunyuan' : (saved || 'hunyuan');
+  });
+  const [result, setResult] = useState<{ timing: Timing; pageCount: number | null; questionCount: number; questions: any[]; rawText: string } | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const stepTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -92,7 +99,7 @@ export default function PDFImportPage() {
             </Text>
 
             <div style={{ maxWidth: 400, margin: '24px auto 0', textAlign: 'left' }}>
-              {stepLabels.map((label, idx) => {
+              {stepLabels[engine].map((label, idx) => {
                 const done = result ? true : idx < currentStep;
                 const active = !result && idx === currentStep;
                 return (
@@ -112,15 +119,17 @@ export default function PDFImportPage() {
                       <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #ddd' }} />
                     )}
                     <Text style={{ flex: 1, fontWeight: done ? 500 : 400 }}>{label}</Text>
-                    {result?.timing && (
-                      <Tag style={{ fontSize: 12, fontFamily: 'monospace' }}>
-                        {idx === 0
-                          ? `${result.timing.pdf_to_images}s`
-                          : idx === 1
-                            ? `${result.timing.ocr_per_page.reduce((a: number, b: number) => a + b, 0).toFixed(1)}s（${result.timing.ocr_per_page.length} 页）`
-                            : `${result.timing.ai_parse}s`}
-                      </Tag>
-                    )}
+                    {result?.timing && (() => {
+                      const t = result.timing;
+                      const text = idx === 0
+                        ? `${(t.pdf_to_images ?? t.mineru ?? 0).toFixed(1)}s`
+                        : idx === 1
+                          ? (t.ocr_per_page
+                              ? `${t.ocr_per_page.reduce((a: number, b: number) => a + b, 0).toFixed(1)}s（${t.ocr_per_page.length} 页）`
+                              : null)
+                          : `${t.ai_parse}s`;
+                      return text ? <Tag style={{ fontSize: 12, fontFamily: 'monospace' }}>{text}</Tag> : null;
+                    })()}
                     {active && !result && <Text className="text-secondary" style={{ fontSize: 12 }}>进行中...</Text>}
                   </div>
                 );
@@ -150,7 +159,7 @@ export default function PDFImportPage() {
             <CheckCircleFilled style={{ fontSize: 48, color: 'var(--red-pen)', marginBottom: 16 }} />
             <Text strong style={{ fontSize: 16, display: 'block' }}>处理完成</Text>
             <Text className="text-secondary" style={{ display: 'block', marginTop: 4 }}>
-              {result.pageCount} 页 PDF → {result.questionCount} 道题目，总耗时 {result.timing.total}s
+              {result.pageCount ? `${result.pageCount} 页 PDF → ` : 'PDF → '}{result.questionCount} 道题目，总耗时 {result.timing.total}s
             </Text>
             <Button type="primary" style={{ marginTop: 20 }} onClick={() => navigate('/questions/batch-edit', { state: { questions: result.questions, raw_text: result.rawText } })}>
               进入批量编辑
@@ -163,7 +172,9 @@ export default function PDFImportPage() {
               点击或拖拽上传 PDF
             </Text>
             <Text className="text-secondary" style={{ display: 'block', marginTop: 4 }}>
-              最大 50MB，最多 30 页，自动 OCR 识别 + AI 题目拆分
+              {engine === 'mineru'
+                ? '最大 50MB，MinerU 在线解析（支持 200 页，公式表格高质量保留）+ AI 题目拆分'
+                : '最大 50MB，最多 30 页，自动 OCR 识别 + AI 题目拆分'}
             </Text>
             <div style={{ marginTop: 12 }}>
               <Text className="text-secondary" style={{ marginRight: 8, fontSize: 13 }}>
@@ -179,8 +190,8 @@ export default function PDFImportPage() {
                 buttonStyle="solid"
                 size="small"
               >
-                <Radio.Button value="hunyuan">HunyuanOCR（云端）</Radio.Button>
-                <Radio.Button value="paddle">PaddleOCR（本地）</Radio.Button>
+                <Radio.Button value="hunyuan">HunyuanOCR（本地 GPU）</Radio.Button>
+                <Radio.Button value="mineru">MinerU（在线）</Radio.Button>
               </Radio.Group>
             </div>
           </Upload.Dragger>

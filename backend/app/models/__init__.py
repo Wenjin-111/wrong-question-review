@@ -14,8 +14,9 @@ from app.models.chat_session import ChatSession
 from app.models.daily_streak import DailyStreak
 from app.models.question_note import QuestionNote
 from app.models.fsrs_state import FsrsState
+from app.models.mineru_image import MineruImage
 
 __all__ = ["User", "Subject", "QuestionType", "Question", "Tag", "QuestionTag",
            "QuestionImage", "ReviewRecord", "QuestionDraft", "UserConfig",
            "ReviewSession", "AiChatMessage", "ChatSession", "DailyStreak",
-           "QuestionNote", "FsrsState"]
+           "QuestionNote", "FsrsState", "MineruImage"]

@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Tabs, Card, Button, Modal, Form, Input, InputNumber, Popconfirm, message, Empty, Space, Tag, Typography, Switch, Upload, Slider } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined, DownloadOutlined, PictureOutlined } from '@ant-design/icons';
+import { Tabs, Card, Button, Modal, Form, Input, InputNumber, Popconfirm, message, Empty, Space, Tag, Typography, Switch, Upload, Slider, Table, Tooltip, Select, DatePicker } from 'antd';
+import dayjs from 'dayjs';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SaveOutlined, DownloadOutlined, PictureOutlined, ReloadOutlined } from '@ant-design/icons';
 import { subjectsApi } from '../api/subjects';
 import { tagsApi } from '../api/tags';
 import { settingsApi } from '../api/settings';
 import { exportApi } from '../api/export';
 import { uploadApi } from '../api/upload';
+import { imagesApi, type ImageItem } from '../api/images';
 import { useGame24 } from '../components/game24/Game24Provider';
 import { useTheme } from '../store/ThemeProvider';
 import type { ThemeId } from '../styles/theme';
@@ -46,6 +48,7 @@ export default function SettingsPage() {
           { key: 'tags', label: '标签管理', children: <TagsTab /> },
           { key: 'spaced', label: '遗忘曲线', children: <SpacedTab /> },
           { key: 'ai', label: 'AI 配置', children: <AiConfigTab /> },
+          { key: 'images', label: '图片管理', children: <ImagesTab /> },
           { key: 'data', label: '数据管理', children: <DataTab /> },
           { key: 'game', label: '游戏', children: <GameTab /> },
           { key: 'appearance', label: '外观', children: <AppearanceTab /> },
@@ -521,6 +524,190 @@ function SpacedTab() {
   );
 }
 
+function ImagesTab() {
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'used' | 'unused'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'upload' | 'mineru'>('all');
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null] | null>(null);
+  const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
+
+  const fetchImages = () => {
+    setLoading(true);
+    imagesApi.list().then(({ data }) => {
+      setImages((data as any).images ?? []);
+    }).catch(() => message.error('加载图片失败'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { fetchImages(); }, []);
+
+  const handleDelete = async (img: ImageItem) => {
+    try {
+      if (img.type === 'mineru') {
+        const name = img.url.split('/').pop() || '';
+        await imagesApi.removeMineru(name);
+      } else if (img.id !== null) {
+        await imagesApi.remove(img.id);
+      }
+      message.success('已删除');
+      setImages((imgs) => imgs.filter((i) => i.url !== img.url));
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || '删除失败');
+    }
+  };
+
+  const formatSize = (n: number) =>
+    n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
+
+  const filtered = images.filter((img) => {
+    if (statusFilter === 'used' && !img.in_use) return false;
+    if (statusFilter === 'unused' && img.in_use) return false;
+    if (typeFilter === 'upload' && img.type !== 'upload') return false;
+    if (typeFilter === 'mineru' && img.type !== 'mineru') return false;
+    if (dateRange && dateRange[0] && dateRange[1]) {
+      const t = dayjs(img.created_at);
+      if (t.isBefore(dateRange[0].startOf('day')) || t.isAfter(dateRange[1].endOf('day'))) return false;
+    }
+    return true;
+  });
+
+  const selectable = filtered.filter((i) => !i.in_use);
+  const allSelectableSelected = selectable.length > 0 && selectable.every((i) => selectedKeys.includes(i.url));
+
+  const handleBatchDelete = async () => {
+    const targets = images.filter((i) => selectedKeys.includes(i.url));
+    try {
+      for (const img of targets) {
+        if (img.type === 'mineru') {
+          const name = img.url.split('/').pop() || '';
+          await imagesApi.removeMineru(name);
+        } else if (img.id !== null) {
+          await imagesApi.remove(img.id);
+        }
+      }
+      message.success(`已删除 ${targets.length} 张图片`);
+      setImages((imgs) => imgs.filter((i) => !selectedKeys.includes(i.url)));
+      setSelectedKeys([]);
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || '部分图片删除失败');
+      fetchImages();
+      setSelectedKeys([]);
+    }
+  };
+
+  return (
+    <Card className="card-elevated" style={{ borderRadius: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <Text strong style={{ fontSize: 16 }}>图片管理</Text>
+        <Space>
+          <Popconfirm
+            title={`删除选中的 ${selectedKeys.length} 张图片？`}
+            description="使用中的图片不可选择，不会受影响"
+            onConfirm={handleBatchDelete}
+            okText="删除"
+          >
+            <Button size="small" danger disabled={selectedKeys.length === 0}>批量删除</Button>
+          </Popconfirm>
+          <Button size="small" disabled={selectable.length === 0}
+            onClick={() => setSelectedKeys(allSelectableSelected ? [] : selectable.map((i) => i.url))}>
+            {allSelectableSelected ? '取消全选' : '全选'}
+          </Button>
+          <Button icon={<ReloadOutlined />} size="small" onClick={fetchImages}>刷新</Button>
+        </Space>
+      </div>
+      <Text className="text-secondary" style={{ fontSize: 13, display: 'block', marginBottom: 12 }}>
+        共 {images.length} 张图片 · 已被题目引用的图片不可删除
+      </Text>
+      <Space style={{ marginBottom: 16 }} wrap>
+        <Select
+          value={typeFilter}
+          onChange={setTypeFilter}
+          style={{ width: 120 }}
+          options={[
+            { label: '全部类型', value: 'all' },
+            { label: '上传', value: 'upload' },
+            { label: 'MinerU', value: 'mineru' },
+          ]}
+        />
+        <Select
+          value={statusFilter}
+          onChange={setStatusFilter}
+          style={{ width: 120 }}
+          options={[
+            { label: '全部状态', value: 'all' },
+            { label: '使用中', value: 'used' },
+            { label: '未使用', value: 'unused' },
+          ]}
+        />
+        <DatePicker.RangePicker
+          allowClear
+          onChange={(v) => setDateRange(v as [dayjs.Dayjs | null, dayjs.Dayjs | null] | null)}
+        />
+        {(statusFilter !== 'all' || typeFilter !== 'all' || dateRange) && (
+          <Button size="small" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); setDateRange(null); }}>清除筛选</Button>
+        )}
+      </Space>
+      {filtered.length === 0 ? (
+        <Empty description={images.length === 0 ? '暂无图片，上传的题目图片会显示在这里' : '没有符合筛选条件的图片'} />
+      ) : (
+        <Table
+          rowKey="url"
+          size="small"
+          loading={loading}
+          dataSource={filtered}
+          rowSelection={{
+            selectedRowKeys: selectedKeys,
+            onChange: setSelectedKeys,
+            getCheckboxProps: (r) => ({ disabled: r.in_use }),
+          }}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            pageSizeOptions: [10, 20, 50],
+            showTotal: (t) => `共 ${t} 张`,
+          }}
+          columns={[
+            {
+              title: '预览', key: 'preview', width: 80,
+              render: (_, r) => (
+                <img src={r.url} alt="" style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid #eee' }} />
+              ),
+            },
+            {
+              title: '类型', dataIndex: 'type', width: 90,
+              render: (v: 'upload' | 'mineru') =>
+                v === 'mineru' ? <Tag color="purple">MinerU</Tag> : <Tag color="blue">上传</Tag>,
+            },
+            {
+              title: '文件名', dataIndex: 'original_name', ellipsis: true,
+              render: (v: string | null, r) => v || r.url.split('/').pop() || '-',
+            },
+            { title: '大小', dataIndex: 'file_size', width: 90, render: (v: number) => formatSize(v) },
+            {
+              title: '上传时间', dataIndex: 'created_at', width: 130,
+              render: (v: string) => new Date(v).toLocaleString(),
+            },
+            {
+              title: '状态', dataIndex: 'in_use', width: 90,
+              render: (v: boolean) => v ? <Tag color="red">使用中</Tag> : <Tag>未使用</Tag>,
+            },
+            {
+              title: '操作', key: 'action', width: 70,
+              render: (_, r) => (
+                <Tooltip title={r.in_use ? '已被题目引用，无法删除' : '删除图片'}>
+                  <Button type="text" danger size="small" icon={<DeleteOutlined />}
+                    disabled={r.in_use} onClick={() => handleDelete(r)} />
+                </Tooltip>
+              ),
+            },
+          ]}
+        />
+      )}
+    </Card>
+  );
+}
+
 function AiConfigTab() {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
@@ -540,21 +727,71 @@ function AiConfigTab() {
   };
 
   return (
-    <Card className="card-elevated" style={{ borderRadius: 14 }}>
-      <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 16 }}>AI 配置</Text>
-      <Text className="text-secondary" style={{ fontSize: 13, display: 'block', marginBottom: 16 }}>OpenAI 兼容 API，密钥 Fernet 加密存储</Text>
-      <Form form={form} layout="vertical">
-        <Form.Item name="api_url" label="API 地址" rules={[{ required: true }]}>
-          <Input placeholder="https://api.openai.com/v1" />
-        </Form.Item>
-        <Form.Item name="api_key" label="API Key">
-          <Input.Password placeholder="sk-..." />
-        </Form.Item>
-        <Form.Item name="model" label="模型名称" rules={[{ required: true }]}>
-          <Input placeholder="gpt-4o" />
-        </Form.Item>
-        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>保存配置</Button>
-      </Form>
+    <>
+      <Card className="card-elevated" style={{ borderRadius: 14 }}>
+        <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 16 }}>AI 配置</Text>
+        <Text className="text-secondary" style={{ fontSize: 13, display: 'block', marginBottom: 16 }}>OpenAI 兼容 API，密钥 Fernet 加密存储</Text>
+        <Form form={form} layout="vertical">
+          <Form.Item name="api_url" label="API 地址" rules={[{ required: true }]}>
+            <Input placeholder="https://api.openai.com/v1" />
+          </Form.Item>
+          <Form.Item name="api_key" label="API Key">
+            <Input.Password placeholder="sk-..." />
+          </Form.Item>
+          <Form.Item name="model" label="模型名称" rules={[{ required: true }]}>
+            <Input placeholder="gpt-4o" />
+          </Form.Item>
+          <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>保存配置</Button>
+        </Form>
+      </Card>
+      <MineruTab />
+    </>
+  );
+}
+
+function MineruTab() {
+  const [token, setToken] = useState('');
+  const [configured, setConfigured] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    settingsApi.getMineruToken().then(({ data }) => {
+      setConfigured(!!data.configured);
+    }).catch(() => {});
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await settingsApi.updateMineruToken(token.trim());
+      setConfigured(token.trim() !== '');
+      setToken('');
+      message.success('已保存');
+    } catch { message.error('保存失败'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Card className="card-elevated" style={{ borderRadius: 14, marginTop: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div>
+          <Text strong style={{ fontSize: 16, display: 'block' }}>MinerU OCR Token</Text>
+          <Text className="text-secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
+            在线文档解析引擎（图片 / PDF → Markdown，公式表格高质量保留，每日 1000 页免费额度），
+            token 在 mineru.net 免费创建，Fernet 加密存储
+          </Text>
+        </div>
+        {configured ? <Tag color="green">已配置</Tag> : <Tag color="orange">未配置</Tag>}
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <Input.Password
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder={configured ? '已配置，输入新 token 可覆盖' : 'sk-...'}
+          style={{ flex: 1 }}
+        />
+        <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={save}>保存</Button>
+      </div>
     </Card>
   );
 }

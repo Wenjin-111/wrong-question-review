@@ -32,7 +32,7 @@
 |------|------|
 | 后端 | Python 3.12+, FastAPI, SQLAlchemy, Alembic, MySQL |
 | 前端 | React 19, TypeScript, Vite, Ant Design 5, Tiptap, Recharts, KaTeX |
-| AI | OpenAI 兼容 API, PaddleOCR, PyMuPDF |
+| AI | OpenAI 兼容 API, HunyuanOCR（本地 GPU）, MinerU 在线解析, PyMuPDF |
 | 安全 | bcrypt, JWT (token 版本轮换), Fernet 加密 |
 
 ## 快速开始

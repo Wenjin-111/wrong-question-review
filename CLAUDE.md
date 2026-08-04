@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cd backend
 .venv\Scripts\activate                          # Activate virtual environment
 pip install -r requirements.txt                  # Core deps
-pip install -r requirements-ocr.txt              # OCR deps (PaddleOCR, PyMuPDF, torch+CUDA for HunyuanOCR)
+pip install -r requirements-ocr.txt              # OCR deps (PyMuPDF, torch+CUDA for HunyuanOCR)
 alembic upgrade head                             # Run DB migrations
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000  # Start dev server
 ```
@@ -71,7 +71,7 @@ frontend/
 - **JWT token_version + token_family**: Both claims in JWT payload (`ver`, `fam`). On refresh, `token_version` is bumped → all existing tokens invalidated (prevents refresh reuse). On logout, `token_family` is regenerated → all tokens revoked.
 - **Question codes**: Generated dynamically as `YYYYMMDD_seqTYPE_ABBR` (e.g., `20260728_01CT`). Computed via `compute_question_codes()` using SQL window functions. Type abbreviations: CT=选择, FT=填空, SA=简答, QA=问答, SB=主观, TF=判断, ES=论述.
 - **AI streaming**: Uses `httpx.AsyncClient.stream()` context manager (NOT `client.post()` or `client.send()`). KaTeX renders LaTeX formulas in chat responses (`\(inline\)` and `\[display\]`).
-- **OCR engines**: Two engines behind `ocr_recognize(engine=...)` — `paddle` (local PaddleOCR, CPU) and `hunyuan` (local HunyuanOCR model inference, requires NVIDIA GPU, model dir from `HUNYUAN_MODEL_DIR`, lazy-loaded singleton in `services/hunyuan_ocr.py`). Default is `hunyuan`. PDF import renders at most 30 pages.
+- **OCR engines**: Two engines behind `ocr_recognize(engine=...)` — `hunyuan` (local HunyuanOCR model inference, requires NVIDIA GPU, model dir from `HUNYUAN_MODEL_DIR`, lazy-loaded singleton in `services/hunyuan_ocr.py`) and `mineru` (online MinerU API, per-user token encrypted in UserConfig `mineru_token`, implemented in `services/mineru_ocr.py`: upload → poll → download full.md). Default is `hunyuan`. PDF import: mineru uploads the PDF directly (≤200 pages); hunyuan renders pages (≤30) then OCRs each.
 - **Spaced repetition**: Self-implemented FSRS in `services/fsrs.py` — stability/difficulty/retrievability math, target retention configurable per-user (default 0.90, settings range 0.70–0.99). `_get_due_question_ids` returns questions with `next_review_at <= now` (fsrs_state) + never-reviewed questions. Rating scale: 1=Again 2=Hard 3=Good 4=Easy.
 - **Frontend routing** (`react-router-dom v7`): `ProtectedRoute` wrapper checks auth state. Paths: `/login`, `/register`, `/`, `/questions`, `/questions/add`, `/questions/ocr`, `/questions/pdf`, `/questions/batch-edit`, `/questions/:id`, `/review`, `/review/session`, `/review/select`, `/review/result`, `/stats`, `/settings`, `/profile`, `/drafts`, `/ai-chat`.
 - **算24小游戏**: Per-account toggle stored in `UserConfig` (`game24_enabled`, endpoints `GET/PUT /api/settings/game24-enabled`). When on, a draggable floating button (position persisted in localStorage) shows on every page bottom-left; clicking opens a Modal with two modes (practice / 60s challenge). Difficulty by solution complexity: easy=1-9 integer-only solutions, medium=1-10, hard=1-13 fraction-only solutions. All logic is pure frontend in `game24/engine.ts` (token-based expression, Fraction arithmetic, exhaustive solver) — no backend solving.

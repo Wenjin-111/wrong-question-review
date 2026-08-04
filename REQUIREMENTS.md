@@ -132,11 +132,10 @@
 
 - 双 OCR 引擎，默认 hunyuan：
   - `hunyuan`：HunyuanOCR 本地模型推理（需 NVIDIA GPU，模型目录由 `HUNYUAN_MODEL_DIR` 配置，进程内懒加载一次）
-  - `paddle`：PaddleOCR 本地 CPU 推理，返回文本块 + 置信度
+  - `mineru`：MinerU 在线解析 API（token 在设置页按用户配置、Fernet 加密存储），输出 Markdown（公式 LaTeX、表格 HTML），免费额度每日 1000 页
 - AI 调用用户配置的 API，结构化提取题目/答案/解析
-- 低置信度文字高亮标记（paddle 引擎）
 - 支持旋转修正、整图跳过框选
-- 支持 PDF 上传（最大 50MB，最多 30 页），全流程串联：PDF → 逐页 OCR → AI 多题拆分
+- 支持 PDF 上传（最大 50MB；mineru 引擎直接上传解析 ≤200 页，hunyuan 引擎最多 30 页），全流程串联：PDF → 解析 → AI 多题拆分
 
 ### 5.3 草稿
 
@@ -337,7 +336,7 @@
 | 迁移 | Alembic |
 | 数据库 | MySQL 8.0 |
 | 认证 | python-jose JWT + bcrypt |
-| OCR | PaddleOCR（本地 CPU）+ HunyuanOCR（本地模型，需 GPU） |
+| OCR | HunyuanOCR（本地模型，需 GPU）+ MinerU（在线解析 API） |
 | PDF | PyMuPDF + fpdf2 |
 | AI | httpx 异步流式调用 OpenAI 兼容 API |
 | 加密 | cryptography (Fernet) |

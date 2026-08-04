@@ -131,7 +131,7 @@
 │   ├── logs/                          # 日志文件
 │   ├── alembic.ini
 │   ├── requirements.txt                # 核心依赖
-│   └── requirements-ocr.txt            # OCR 依赖（PaddleOCR/PyMuPDF/torch+CUDA）
+│   └── requirements-ocr.txt            # OCR 依赖（PyMuPDF/torch+CUDA）
 │
 ├── REQUIREMENTS.md                    # 需求文档
 ├── TECHNICAL_DESIGN.md                # 本文件
@@ -245,7 +245,7 @@
 
 ### 3.5 OCR/AI 解析 (`/api`)
 
-双引擎：`engine` 参数 `hunyuan`（默认，本地模型推理，需 GPU）或 `paddle`（本地 PaddleOCR，CPU）。
+双引擎：`engine` 参数 `hunyuan`（默认，本地模型推理，需 GPU）或 `mineru`（MinerU 在线解析 API，按用户配置 token）。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|

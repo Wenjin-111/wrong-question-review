@@ -28,6 +28,10 @@ class AiConfigRequest(BaseModel):
     model: str
 
 
+class MineruTokenRequest(BaseModel):
+    token: str
+
+
 class UserInfoUpdate(BaseModel):
     username: str | None = None
     email: str | None = None
@@ -213,6 +217,21 @@ def update_signature(req: SignatureRequest, db: Session = Depends(get_db), curre
     config.config_value = req.signature[:100]
     db.commit()
     return {"signature": config.config_value}
+
+
+@router.get("/mineru-token")
+def get_mineru_token(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    config = _get_or_create_config(db, current_user.id, "mineru_token", "")
+    return {"configured": bool(config.config_value)}
+
+
+@router.put("/mineru-token")
+def update_mineru_token(req: MineruTokenRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    config = _get_or_create_config(db, current_user.id, "mineru_token")
+    token = req.token.strip()
+    config.config_value = encrypt_api_key(token) if token else ""
+    db.commit()
+    return {"ok": True}
 
 
 @router.put("/ai-config")

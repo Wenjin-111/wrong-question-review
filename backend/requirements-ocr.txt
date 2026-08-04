@@ -1,8 +1,6 @@
 # OCR / PDF / 导出 相关重型依赖 — 阶段 4 之后需要时再安装
 # 安装命令：uv pip install -r requirements-ocr.txt
 
-paddleocr==2.9.*
-paddlepaddle==3.0.*
 pymupdf==1.25.*
 fpdf2==2.8.*
 pillow==11.1.*

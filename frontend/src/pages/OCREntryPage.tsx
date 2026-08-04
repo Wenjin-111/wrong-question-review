@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Typography, Button, Upload, Steps, Input, message, Space, Spin, Radio, Segmented, Switch, Tag } from 'antd';
-import { CameraOutlined, ScanOutlined, RobotOutlined, CheckCircleOutlined, ArrowLeftOutlined, FileTextOutlined, EyeOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { Card, Typography, Button, Upload, Steps, Input, message, Space, Spin, Radio, Segmented, Switch, Tag, Tooltip } from 'antd';
+import { CameraOutlined, ScanOutlined, RobotOutlined, ArrowLeftOutlined, FileTextOutlined, EyeOutlined, CheckCircleFilled } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 import { uploadApi } from '../api/upload';
 import { ocrApi } from '../api/ocr';
@@ -10,7 +10,9 @@ import ImageCropper from '../components/common/ImageCropper';
 
 const { Title, Text } = Typography;
 
-type Step = 'upload' | 'crop' | 'ocr' | 'parse' | 'verify';
+type Step = 'upload' | 'crop' | 'ocr' | 'parse';
+
+const TYPE_LABELS: Record<string, string> = { choice: '选择题', fill: '填空题', subjective: '主观题' };
 
 interface ImageFile {
   fileId: number;
@@ -28,12 +30,19 @@ export default function OCREntryPage() {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [croppingIdx, setCroppingIdx] = useState<number | null>(null);
   const [ocrText, setOcrText] = useState('');
-  const [ocrBlocks, setOcrBlocks] = useState<any[]>([]);
   const [ocrElapsed, setOcrElapsed] = useState(0);
-  const [aiResult, setAiResult] = useState<Record<string, string> | null>(null);
+  const [ocrSeconds, setOcrSeconds] = useState(0);
+  const [ocrProgress, setOcrProgress] = useState<{ current: number; total: number } | null>(null);
+  const [aiResult, setAiResult] = useState<Record<string, any> | null>(null);
+  const [aiParsing, setAiParsing] = useState(false);
+  const [aiSeconds, setAiSeconds] = useState(0);
+  const [aiElapsed, setAiElapsed] = useState(0);
   const [editedOcr, setEditedOcr] = useState('');
   const [loading, setLoading] = useState(false);
-  const [engine, setEngine] = useState(() => localStorage.getItem('ocr_engine') || 'hunyuan');
+  const [engine, setEngine] = useState(() => {
+    const saved = localStorage.getItem('ocr_engine');
+    return saved === 'paddle' ? 'hunyuan' : (saved || 'hunyuan');
+  });
   const [viewMode, setViewMode] = useState<'raw' | 'md'>('raw' as 'raw' | 'md');
   const [multiQuestion, setMultiQuestion] = useState(false);
   const processedRef = useRef(false);
@@ -90,11 +99,13 @@ export default function OCREntryPage() {
   const startOCRWithImages = async (imgs: ImageFile[]) => {
     setLoading(true);
     setStep('ocr');
+    setOcrSeconds(0);
+    setOcrProgress({ current: 0, total: imgs.length });
     const allTexts: string[] = [];
-    const allBlocks: any[] = [];
     let totalElapsed = 0;
 
     for (let i = 0; i < imgs.length; i++) {
+      setOcrProgress({ current: i + 1, total: imgs.length });
       try {
         const img = imgs[i];
         const { data } = await ocrApi.recognize({
@@ -104,7 +115,6 @@ export default function OCREntryPage() {
           engine,
         });
         allTexts.push(data.raw_text || '');
-        allBlocks.push(...(data.blocks || []));
         totalElapsed += data.elapsed || 0;
       } catch (err: any) {
         const detail = err.response?.data?.detail;
@@ -116,21 +126,56 @@ export default function OCREntryPage() {
 
     const combined = allTexts.join('\n\n---\n\n');
     setOcrText(combined);
-    setOcrBlocks(allBlocks);
     setEditedOcr(combined);
     setOcrElapsed(Math.round(totalElapsed * 100) / 100);
+    setOcrProgress(null);
     setLoading(false);
   };
 
-  const stepOrder: Step[] = ['upload', 'crop', 'ocr', 'parse', 'verify'];
+  const stepOrder: Step[] = ['upload', 'crop', 'ocr', 'parse'];
+
+  // 识别开始后锁定引擎切换（ocr/parse 步骤），避免更换引擎但结果不更新的误导
+  const engineLocked = step === 'ocr' || step === 'parse';
+
+  // OCR 识别 / AI 解析过程的实时秒表
+  useEffect(() => {
+    if (loading && step === 'ocr' && !aiParsing) {
+      const t = setInterval(() => setOcrSeconds((s) => s + 1), 1000);
+      return () => clearInterval(t);
+    }
+  }, [loading, step, aiParsing]);
+
+  useEffect(() => {
+    if (aiParsing) {
+      const t = setInterval(() => setAiSeconds((s) => s + 1), 1000);
+      return () => clearInterval(t);
+    }
+  }, [aiParsing]);
 
   const goBack = () => {
     const idx = stepOrder.indexOf(step);
-    if (idx > 0) setStep(stepOrder[idx - 1]);
+    if (idx > 0) {
+      const prev = stepOrder[idx - 1];
+      if (prev === 'crop') {
+        if (images.length > 1) {
+          // 多图：回"选择"视图（网格），不直接进裁剪器
+          setStep('crop');
+          setCroppingIdx(null);
+        } else {
+          // 单图没有选择视图，直接回上传页
+          setStep('upload');
+        }
+      } else {
+        setStep(prev);
+      }
+    }
   };
 
   const handleAiParseRequest = async () => {
     setLoading(true);
+    setAiParsing(true);
+    setAiSeconds(0);
+    const t0 = performance.now();
     try {
       if (multiQuestion) {
         const { data } = await ocrApi.parseBatch({ ocr_text: editedOcr });
@@ -139,16 +184,22 @@ export default function OCREntryPage() {
           message.warning('AI 未能解析出题目');
           return;
         }
+        const elapsed = Math.round(((performance.now() - t0) / 1000) * 10) / 10;
+        message.success(`AI 解析完成，用时 ${elapsed}s`);
         navigate('/questions/batch-edit', { state: { questions, raw_text: editedOcr, source: 'ocr' } });
       } else {
         const { data } = await ocrApi.parse({ ocr_text: editedOcr });
         setAiResult(data);
+        setAiElapsed(Math.round(((performance.now() - t0) / 1000) * 10) / 10);
         setStep('parse');
       }
     } catch (err: any) {
       message.error(err.response?.data?.detail || 'AI 解析失败');
     }
-    finally { setLoading(false); }
+    finally {
+      setLoading(false);
+      setAiParsing(false);
+    }
   };
 
   const handleSkipAi = () => {
@@ -161,7 +212,17 @@ export default function OCREntryPage() {
         },
       });
     } else {
-      setStep('verify');
+      navigate('/questions/add', {
+        state: {
+          ocrData: {
+            content: editedOcr,
+            answer: '',
+            explanation: '',
+            ocr_text: ocrText,
+            image_file_id: images[0]?.fileId,
+          },
+        },
+      });
     }
   };
 
@@ -172,6 +233,10 @@ export default function OCREntryPage() {
           content: aiResult?.question || editedOcr,
           answer: aiResult?.answer || '',
           explanation: aiResult?.explanation || '',
+          type: aiResult?.type,
+          options: aiResult?.options,
+          correct: aiResult?.correct,
+          blanks: aiResult?.blanks,
           ocr_text: ocrText,
           image_file_id: images[0]?.fileId,
         },
@@ -184,17 +249,37 @@ export default function OCREntryPage() {
     { title: '框选', icon: <ScanOutlined /> },
     { title: 'OCR', icon: <ScanOutlined /> },
     { title: 'AI 解析', icon: <RobotOutlined /> },
-    { title: '确认', icon: <CheckCircleOutlined /> },
   ];
 
-  const currentStepIdx = ['upload', 'crop', 'ocr', 'parse', 'verify'].indexOf(step);
+  const currentStepIdx = ['upload', 'crop', 'ocr', 'parse'].indexOf(step);
   const allCropped = images.every((img) => img.cropped);
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-      <Title level={4} style={{ fontWeight: 600, letterSpacing: '-0.02em', marginBottom: 20 }}>
-        OCR 智能录入
-      </Title>
+      <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => navigate('/questions/add')} style={{ marginBottom: 8 }}>
+        返回手动录入
+      </Button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, gap: 16 }}>
+        <Title level={4} style={{ fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
+          OCR 智能录入
+        </Title>
+        <Tooltip title={engineLocked ? '识别已开始，引擎已锁定；返回框选页后可更换' : ''}>
+          <Radio.Group
+            value={engine}
+            disabled={engineLocked}
+            onChange={(e) => {
+              setEngine(e.target.value);
+              localStorage.setItem('ocr_engine', e.target.value);
+            }}
+            optionType="button"
+            buttonStyle="solid"
+            size="small"
+          >
+            <Radio.Button value="hunyuan">HunyuanOCR（本地 GPU）</Radio.Button>
+            <Radio.Button value="mineru">MinerU（在线）</Radio.Button>
+          </Radio.Group>
+        </Tooltip>
+      </div>
 
       <Steps current={currentStepIdx} items={steps} style={{ marginBottom: 24 }} />
 
@@ -202,7 +287,16 @@ export default function OCREntryPage() {
         {loading && (
           <div style={{ textAlign: 'center', padding: 40 }}>
             <Spin size="large" />
-            <Text className="text-secondary" style={{ display: 'block', marginTop: 12 }}>处理中...</Text>
+            <Text className="text-secondary" style={{ display: 'block', marginTop: 12 }}>
+              {aiParsing
+                ? 'AI 正在解析题目...'
+                : ocrProgress && ocrProgress.total > 0
+                  ? `正在识别第 ${ocrProgress.current}/${ocrProgress.total} 张图片...`
+                  : '处理中...'}
+            </Text>
+            <Text style={{ display: 'block', marginTop: 8, fontFamily: 'monospace', fontSize: 18 }}>
+              {(aiParsing ? aiSeconds : ocrSeconds)}s
+            </Text>
           </div>
         )}
 
@@ -219,7 +313,7 @@ export default function OCREntryPage() {
             >
               <CameraOutlined style={{ fontSize: 48, color: 'var(--blue-ink)', marginBottom: 16 }} />
               <Text strong style={{ fontSize: 16, display: 'block' }}>点击或拖拽上传题目图片（支持多张）</Text>
-              <Text className="text-secondary" style={{ display: 'block', marginTop: 4 }}>支持 jpg/png/bmp/webp，最大 10MB / 张</Text>
+              <Text className="text-secondary" style={{ display: 'block', marginTop: 4 }}>支持 jpg/png/bmp/webp，最大 10MB / 张，可框选局部或直接完整解析</Text>
             </Upload.Dragger>
 
             {previewUrls.length > 0 && (
@@ -229,11 +323,28 @@ export default function OCREntryPage() {
                   {previewUrls.map((url, idx) => (
                     <div key={idx} style={{ position: 'relative', width: 120, height: 120, borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e5e5' }}>
                       <img src={url} alt="" style={{ width: 120, height: 120, objectFit: 'cover' }} />
+                      <Button
+                        type="text" danger size="small"
+                        style={{ position: 'absolute', top: 2, right: 2, background: 'rgba(255,255,255,0.9)', borderRadius: 4 }}
+                        onClick={() => {
+                          URL.revokeObjectURL(url);
+                          setPreviewUrls((prev) => prev.filter((_, i) => i !== idx));
+                          setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                      >
+                        删除
+                      </Button>
                     </div>
                   ))}
                 </div>
                 <Space style={{ marginTop: 16 }}>
                   <Button type="primary" onClick={async () => {
+                    const imgs = await uploadAll();
+                    if (imgs.length > 0) startOCRWithImages(imgs);
+                  }}>
+                    开始解析
+                  </Button>
+                  <Button onClick={async () => {
                     const imgs = await uploadAll();
                     if (imgs.length > 0) {
                       setCroppingIdx(0);
@@ -242,41 +353,21 @@ export default function OCREntryPage() {
                   }}>
                     开始框选
                   </Button>
-                  <Button onClick={async () => {
-                    const imgs = await uploadAll();
-                    if (imgs.length > 0) startOCRWithImages(imgs);
-                  }}>
-                    跳过框选，直接 OCR
-                  </Button>
                 </Space>
               </div>
             )}
-
-            <div style={{ marginTop: 16 }}>
-              <Text className="text-secondary" style={{ marginRight: 8 }}>OCR 引擎：</Text>
-              <Radio.Group
-                value={engine}
-                onChange={(e) => {
-                  setEngine(e.target.value);
-                  localStorage.setItem('ocr_engine', e.target.value);
-                }}
-                optionType="button"
-                buttonStyle="solid"
-                size="small"
-              >
-                <Radio.Button value="hunyuan">HunyuanOCR（云端）</Radio.Button>
-                <Radio.Button value="paddle">PaddleOCR（本地）</Radio.Button>
-              </Radio.Group>
-            </div>
           </div>
         )}
 
         {/* ---- Crop Step: Cropping a specific image ---- */}
         {!loading && step === 'crop' && croppingIdx !== null && images[croppingIdx] && (
           <div>
-            <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ marginBottom: 12 }}>
               <Space>
-                <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => setCroppingIdx(null)}>
+                <Button type="text" icon={<ArrowLeftOutlined />} onClick={() => {
+                  if (images.length > 1) setCroppingIdx(null);
+                  else setStep('upload');
+                }}>
                   返回选择
                 </Button>
                 {images.length > 1 && (
@@ -299,7 +390,6 @@ export default function OCREntryPage() {
                   </>
                 )}
               </Space>
-              <Button onClick={() => startOCRWithImages(images)}>跳过所有框选</Button>
             </div>
 
             {/* Thumbnail strip for quick navigation */}
@@ -389,11 +479,15 @@ export default function OCREntryPage() {
                 </div>
               ))}
             </div>
-            <div style={{ marginTop: 20, display: 'flex', gap: 12 }}>
+            <div style={{ marginTop: 20 }}>
               <Button type="primary" onClick={() => startOCRWithImages(images)} disabled={!allCropped}>
-                {allCropped ? '开始 OCR 识别' : '跳过剩余框选，开始 OCR'}
+                {allCropped ? '开始解析' : `还有 ${images.length - images.filter((i) => i.cropped).length} 张未框选`}
               </Button>
-              <Button onClick={() => startOCRWithImages(images)}>跳过所有框选，直接 OCR</Button>
+              {!allCropped && (
+                <Text className="text-secondary" style={{ marginLeft: 12, fontSize: 13 }}>
+                  可逐张使用"完整解析"，或返回上传页重新选择
+                </Text>
+              )}
             </div>
           </div>
         )}
@@ -402,10 +496,11 @@ export default function OCREntryPage() {
         {!loading && step === 'ocr' && (
           <div>
             <div style={{ marginBottom: 12 }}>
-              <Button type="text" icon={<ArrowLeftOutlined />} onClick={goBack}>返回框选</Button>
+              <Button type="text" icon={<ArrowLeftOutlined />} onClick={goBack}>返回选择</Button>
             </div>
             <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 4 }}>OCR 识别结果</Text>
             <Space style={{ marginBottom: 12 }}>
+              <Tag color="geekblue" style={{ fontSize: 12 }}>引擎：{engine === 'mineru' ? 'MinerU（在线）' : 'HunyuanOCR（本地 GPU）'}</Tag>
               {ocrElapsed > 0 && (
                 <Tag color="blue" style={{ fontSize: 12 }}>总耗时 {ocrElapsed}s</Tag>
               )}
@@ -460,19 +555,6 @@ export default function OCREntryPage() {
               />
             )}
 
-            {ocrBlocks.length > 0 && engine === 'paddle' && (
-              <div style={{ marginTop: 8 }}>
-                <Text className="text-secondary" style={{ fontSize: 12 }}>
-                  置信度低片段：
-                  {ocrBlocks.filter((b: any) => b.confidence < 0.7).map((b: any, i: number) => (
-                    <span key={i} style={{ background: '#FFF3CD', padding: '1px 4px', borderRadius: 3, margin: '0 4px' }}>
-                      {b.text} ({Math.round(b.confidence * 100)}%)
-                    </span>
-                  ))}
-                  {ocrBlocks.filter((b: any) => b.confidence < 0.7).length === 0 && ' 无'}
-                </Text>
-              </div>
-            )}
             <div style={{ marginTop: 16, display: 'flex', gap: 12 }}>
               <Button type="primary" onClick={handleAiParseRequest} icon={<RobotOutlined />}>
                 {multiQuestion ? 'AI 多题拆分解析' : 'AI 智能解析'}
@@ -490,7 +572,13 @@ export default function OCREntryPage() {
             <div style={{ marginBottom: 12 }}>
               <Button type="text" icon={<ArrowLeftOutlined />} onClick={goBack}>返回修正 OCR</Button>
             </div>
-            <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 16 }}>AI 解析结果</Text>
+            <Space style={{ marginBottom: 16 }}>
+              <Text strong style={{ fontSize: 15 }}>AI 解析结果</Text>
+              {aiResult.type && (
+                <Tag color="geekblue">题型：{TYPE_LABELS[aiResult.type] || aiResult.type}</Tag>
+              )}
+              {aiElapsed > 0 && <Tag color="blue">解析耗时 {aiElapsed}s</Tag>}
+            </Space>
             {[
               { label: '题目内容', key: 'question', value: aiResult.question },
               { label: '正确答案', key: 'answer', value: aiResult.answer },
@@ -516,27 +604,7 @@ export default function OCREntryPage() {
           </div>
         )}
 
-        {/* ---- Verify Step (single question, skip AI) ---- */}
-        {!loading && step === 'verify' && (
-          <div style={{ textAlign: 'center', padding: 40 }}>
-            <div style={{ textAlign: 'left', marginBottom: 12 }}>
-              <Button type="text" icon={<ArrowLeftOutlined />} onClick={goBack}>返回上一步</Button>
-            </div>
-            <CheckCircleOutlined style={{ fontSize: 48, color: 'var(--red-pen)', marginBottom: 16 }} />
-            <Text strong style={{ fontSize: 16, display: 'block' }}>OCR 识别完成 {ocrElapsed > 0 && `(耗时 ${ocrElapsed}s)`}</Text>
-            <Text className="text-secondary" style={{ display: 'block', marginTop: 4, marginBottom: 20 }}>
-              识别结果将作为草稿保存，您可以在编辑页面中继续完善
-            </Text>
-            <Button type="primary" onClick={handleConfirm}>填入表单继续编辑</Button>
-          </div>
-        )}
       </Card>
-
-      <div style={{ textAlign: 'center', marginTop: 12 }}>
-        <Button type="text" onClick={() => navigate('/questions/add')} style={{ color: 'var(--ink-secondary)' }}>
-          返回手动录入
-        </Button>
-      </div>
     </div>
   );
 }

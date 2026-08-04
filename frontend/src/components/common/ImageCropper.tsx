@@ -78,7 +78,7 @@ export default function ImageCropper({ src, onCrop, onSkip }: Props) {
         <Space>
           <Button icon={<RotateLeftOutlined />} onClick={() => rotate(-90)}>左转</Button>
           <Button icon={<RotateRightOutlined />} onClick={() => rotate(90)}>右转</Button>
-          <Button onClick={onSkip}>使用整张图片</Button>
+          <Button onClick={onSkip}>完整解析</Button>
         </Space>
       </div>
       <div
@@ -130,7 +130,7 @@ export default function ImageCropper({ src, onCrop, onSkip }: Props) {
       </div>
       {crop && crop.width > 20 && (
         <div style={{ marginTop: 12 }}>
-          <Button type="primary" onClick={confirmCrop}>确认框选，开始识别</Button>
+          <Button type="primary" onClick={confirmCrop}>确认框选，开始解析</Button>
         </div>
       )}
       <div style={{ marginTop: 8, color: 'var(--ink-secondary)', fontSize: 13 }}>

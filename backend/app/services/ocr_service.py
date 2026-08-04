@@ -1,20 +1,10 @@
 import logging
+import os
 import time
 
-import numpy as np
 from PIL import Image
 
 logger = logging.getLogger(__name__)
-
-_ocr_instance = None
-
-
-def _get_ocr():
-    global _ocr_instance
-    if _ocr_instance is None:
-        from paddleocr import PaddleOCR
-        _ocr_instance = PaddleOCR(lang="ch", use_gpu=False)
-    return _ocr_instance
 
 
 def _load_image(image_path: str, crop: dict | None, rotation: int):
@@ -26,29 +16,6 @@ def _load_image(image_path: str, crop: dict | None, rotation: int):
     return img
 
 
-def _ocr_paddle(image) -> dict:
-    """PaddleOCR: 本地 CPU 推理，返回逐块结果。"""
-    ocr = _get_ocr()
-    img_array = np.array(image)
-    t0 = time.perf_counter()
-    results = ocr.ocr(img_array, cls=False)
-    elapsed = round(time.perf_counter() - t0, 2)
-
-    blocks = []
-    if results and results[0]:
-        for item in results[0]:
-            if len(item) == 2:
-                bbox, (text, confidence) = item
-            else:
-                text = getattr(item, "text", "")
-                confidence = getattr(item, "confidence", 0)
-                bbox = getattr(item, "bbox", [])
-            blocks.append({"text": str(text), "confidence": round(float(confidence), 4), "bbox": bbox if isinstance(bbox, list) else []})
-
-    raw_text = "\n".join(b["text"] for b in blocks if b["text"].strip())
-    return {"raw_text": raw_text, "blocks": blocks, "elapsed": elapsed}
-
-
 def _ocr_hunyuan(image) -> dict:
     """HunyuanOCR: 本地模型推理（懒加载），返回 Markdown 格式文本。"""
     from app.services.hunyuan_ocr import hunyuan_ocr
@@ -56,14 +23,32 @@ def _ocr_hunyuan(image) -> dict:
     return hunyuan_ocr(image)
 
 
-def ocr_recognize(image_path: str, crop: dict | None = None, rotation: int = 0, engine: str = "hunyuan") -> dict:
-    """OCR 识别，支持 paddle（本地 PaddleOCR）和 hunyuan（本地 HunyuanOCR 模型）两种引擎。"""
+def _ocr_mineru(image, token: str) -> dict:
+    """MinerU: 在线 API 解析（图片 → Markdown），需用户配置 token。"""
+    import tempfile
+
+    from app.services.mineru_ocr import parse_file
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        image.save(tmp_path)
+        result = parse_file(tmp_path, token)
+    finally:
+        os.remove(tmp_path)
+    result["blocks"] = []
+    return result
+
+
+def ocr_recognize(image_path: str, crop: dict | None = None, rotation: int = 0, engine: str = "hunyuan", token: str | None = None) -> dict:
+    """OCR 识别，支持 hunyuan（本地 HunyuanOCR，默认）和 mineru（MinerU 在线 API）两种引擎。"""
     img = _load_image(image_path, crop, rotation)
 
-    if engine == "hunyuan":
-        return _ocr_hunyuan(img)
-    else:
-        return _ocr_paddle(img)
+    if engine == "mineru":
+        if not token:
+            raise RuntimeError("未配置 MinerU token，请在设置页配置")
+        return _ocr_mineru(img, token)
+    return _ocr_hunyuan(img)
 
 
 def pdf_to_images(file_path: str, max_pages: int = 30) -> list:

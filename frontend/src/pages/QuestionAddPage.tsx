@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, memo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { Card, Form, Select, Input, Button, message, Row, Col, Typography, Radio, Checkbox, Space, Divider, Segmented } from 'antd';
+import { Card, Form, Select, Input, Button, message, Row, Col, Typography, Radio, Checkbox, Space, Divider, Segmented, Tag } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
 import { subjectsApi } from '../api/subjects';
 import { tagsApi } from '../api/tags';
@@ -126,7 +126,14 @@ export default function QuestionAddPage() {
 
     if (ocrData) {
       if (ocrData.content) setContent(ocrData.content);
-      if (ocrData.answer) {
+      if (ocrData.type === 'choice' && Array.isArray(ocrData.options) && ocrData.options.length) {
+        setAnswerType('choice');
+        setOptions(ocrData.options);
+        setCorrectOptions(ocrData.correct ? [ocrData.correct] : []);
+      } else if (ocrData.type === 'fill' && Array.isArray(ocrData.blanks)) {
+        setAnswerType('fill');
+        setBlanks(ocrData.blanks.filter((b: string) => b.trim()) || ['']);
+      } else if (ocrData.answer) {
         try {
           const ans = JSON.parse(ocrData.answer);
           if (ans.options) { setAnswerType('choice'); setOptions(ans.options); setCorrectOptions(ans.correct || []); }
@@ -135,7 +142,7 @@ export default function QuestionAddPage() {
         } catch { setAnswerType('subjective'); setReferenceAnswer(ocrData.answer); }
       }
       if (ocrData.explanation) setExplanation(ocrData.explanation);
-      message.info('AI 解析结果已填入表单，请补充学科、题型等信息后保存');
+      message.info({ content: 'AI 解析结果已填入表单，请补充学科、题型等信息后保存', key: 'ai-parse-filled' });
       window.history.replaceState({}, document.title);
       return;
     }
@@ -156,7 +163,6 @@ export default function QuestionAddPage() {
       }
       if (draftData.source) form.setFieldValue('source', draftData.source);
       if (draftData.tag_ids) form.setFieldValue('tag_ids', draftData.tag_ids);
-      if (draftId) draftApi.delete(draftId).catch(() => {});
       window.history.replaceState({}, document.title);
       return;
     }
@@ -223,6 +229,8 @@ export default function QuestionAddPage() {
         await questionsApi.create(payload);
         message.success('已保存');
       }
+      // 草稿成功转为题目后再清理，避免中途放弃编辑导致草稿丢失
+      if (draftId) draftApi.delete(draftId).catch(() => {});
       navigate('/questions');
     } catch (err: any) {
       message.error(err.response?.data?.detail || '保存失败');
@@ -396,14 +404,51 @@ export default function QuestionAddPage() {
             ) : (
               <Text className="text-tertiary" style={{ fontSize: 14 }}>在左侧输入题目内容后，这里会实时显示预览效果</Text>
             )}
-            {explanation && (
-              <>
-                <Divider />
-                <Text strong style={{ fontSize: 13, color: 'var(--blue-ink)' }}>解析</Text>
-                <div className="markdown-preview"
-                  style={{ fontSize: 14, lineHeight: 1.7, marginTop: 8 }}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(explanation) }} />
-              </>
+            {(() => {
+              const hasAnswer = answerType === 'choice'
+                ? correctOptions.length > 0 || options.some((o) => o.trim())
+                : answerType === 'fill'
+                  ? blanks.some((b) => b.trim())
+                  : referenceAnswer.trim() !== '';
+              if (!hasAnswer) return null;
+              return (
+                <>
+                  <Divider />
+                  <Text strong style={{ fontSize: 13, color: 'var(--red-pen)' }}>正确答案</Text>
+                  {answerType === 'choice' && (
+                    <div style={{ fontSize: 14, lineHeight: 1.8, marginTop: 8 }}>
+                      {options.map((o, i) => {
+                        const letter = String.fromCharCode(65 + i);
+                        const isCorrect = correctOptions.includes(letter);
+                        return (
+                          <div key={i} style={{ color: isCorrect ? 'var(--red-pen)' : undefined, fontWeight: isCorrect ? 600 : 400 }}>
+                            {letter}. {o || `（选项 ${letter} 未填写）`} {isCorrect && '✓'}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {answerType === 'fill' && (
+                    <div style={{ marginTop: 8 }}>
+                      {blanks.map((b, i) => <Tag key={i} color="blue" style={{ marginRight: 8 }}>{b || `空 ${i + 1}`}</Tag>)}
+                    </div>
+                  )}
+                  {answerType === 'subjective' && (
+                    <div className="markdown-preview"
+                      style={{ fontSize: 14, lineHeight: 1.7, marginTop: 8 }}
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(referenceAnswer) }} />
+                  )}
+                </>
+              );
+            })()}
+            <Divider />
+            <Text strong style={{ fontSize: 13, color: 'var(--blue-ink)' }}>解析</Text>
+            {explanation ? (
+              <div className="markdown-preview"
+                style={{ fontSize: 14, lineHeight: 1.7, marginTop: 8 }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(explanation) }} />
+            ) : (
+              <Text className="text-tertiary" style={{ fontSize: 13, display: 'block', marginTop: 8 }}>暂无解析</Text>
             )}
           </Card>
         </Col>
